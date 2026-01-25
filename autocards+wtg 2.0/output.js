@@ -1,6 +1,9 @@
 // output.js - Combined WTG 2.0 Lightweight + AutoCards output processing
 // WTG runs first for time consistency, then AutoCards processes the result
 
+// Performance safeguard: limit storycard processing for scenarios with many cards
+const MAX_STORYCARDS_TO_PROCESS = 200;
+
 const modifier = (text) => {
   // ============ WTG PROCESSING FIRST ============
   // Ensure state.turnTime is always initialized
@@ -25,9 +28,11 @@ const modifier = (text) => {
 
   // Check for [settime] command in storycards at scenario start
   if (state.startingDate === '01/01/1900' && info.actionCount <= 1) {
-    // Scan all storycards for [settime] commands
-    for (const card of storyCards) {
-      if (card.entry) {
+    // Scan storycards for [settime] commands (limited for performance)
+    const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+    for (let i = 0; i < maxCards; i++) {
+      const card = storyCards[i];
+      if (card && card.entry) {
         // Match [settime date time] format - handle both "mm/dd/yyyy" and variations
         const settimeMatch = card.entry.match(/\[settime\s+(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\s+(.+?)\]/i);
         if (settimeMatch) {
@@ -232,8 +237,11 @@ const modifier = (text) => {
     const combinedText = (lastAction ? lastAction.text : '') + ' ' + modifiedText;
 
     // Add timestamps to storycards that don't have them but whose keywords were mentioned
-    for (let i = 0; i < storyCards.length; i++) {
+    // Limit storycard processing for performance (scenarios with 900+ cards)
+    const maxTimestampCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+    for (let i = 0; i < maxTimestampCards; i++) {
       const card = storyCards[i];
+      if (!card) continue;
 
       // Skip system cards
       if (card.title === "WTG Data" || card.title === "Current Date and Time" || card.title === "World Time Generator Settings" || card.title === "WTG Exclusions") {

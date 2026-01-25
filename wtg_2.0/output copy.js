@@ -1,5 +1,8 @@
 // output.js - Handle AI responses and update storycards for the new WTG implementation
 
+// Performance safeguard: limit storycard processing for scenarios with many cards
+const MAX_STORYCARDS_TO_PROCESS = 200;
+
 const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
@@ -35,9 +38,11 @@ const modifier = (text) => {
 
   // Check for [settime] command in storycards at scenario start
   if (state.startingDate === '01/01/1900' && info.actionCount <= 1) {
-    // Scan all storycards for [settime] commands
-    for (const card of storyCards) {
-      if (card.entry) {
+    // Scan storycards for [settime] commands (limited for performance)
+    const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+    for (let i = 0; i < maxCards; i++) {
+      const card = storyCards[i];
+      if (card && card.entry) {
         // Match [settime date time] format - handle both "mm/dd/yyyy" and variations
         const settimeMatch = card.entry.match(/\[settime\s+(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\s+(.+?)\]/i);
         if (settimeMatch) {
@@ -814,8 +819,11 @@ const modifier = (text) => {
     const recentHistoryText = history.slice(-5).map(h => h.text).join(' '); // Last 5 actions
     const scanText = fullText + ' ' + recentHistoryText;
 
-    // Process exclusion markers [e] on all storycards
-    for (const card of storyCards) {
+    // Process exclusion markers [e] on storycards (limited for performance)
+    const maxExclusionCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+    for (let i = 0; i < maxExclusionCards; i++) {
+      const card = storyCards[i];
+      if (!card) continue;
       // Skip system cards
       if (card.title === "WTG Data" || card.title === "Current Date and Time" ||
           card.title === "World Time Generator Settings" || card.title === "WTG Cooldowns" ||
