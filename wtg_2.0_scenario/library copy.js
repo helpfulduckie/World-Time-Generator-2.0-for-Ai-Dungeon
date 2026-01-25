@@ -4,8 +4,8 @@
 // Performance optimization: System card titles Set for O(1) lookups
 const SYSTEM_CARD_TITLES = new Set([
   "WTG Data", "Current Date and Time", "World Time Generator Settings",
-  "WTG Cooldowns", "WTG Exclusions", "Configure Inner Self",
-  "Configure Auto-Cards", "Debug Data"
+  "WTG Cooldowns", "WTG Exclusions", "WTG Time Config",
+  "Configure Inner Self", "Configure Auto-Cards", "Debug Data"
 ]);
 
 /**
@@ -46,6 +46,63 @@ function addToSystemCardCache(title, card) {
   if (SYSTEM_CARD_TITLES.has(title)) {
     state._sysCardCache[title] = card;
   }
+}
+
+/**
+ * Get WTG Time Config card (pre-imported by user)
+ * @returns {Object|null} Config card or null
+ */
+function getWTGTimeConfigCard() {
+  return getCachedSystemCard("WTG Time Config");
+}
+
+/**
+ * Parse WTG Time Config card for starting date/time
+ * @returns {Object|null} Parsed config {startingDate, startingTime, initialized} or null
+ */
+function parseWTGTimeConfig() {
+  const configCard = getWTGTimeConfigCard();
+  if (!configCard || !configCard.entry) return null;
+
+  const dateMatch = configCard.entry.match(/Starting Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+  const timeMatch = configCard.entry.match(/Starting Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+  const initMatch = configCard.entry.match(/Initialized:\s*(true|false)/i);
+
+  if (!dateMatch || !timeMatch) return null;
+
+  return {
+    startingDate: dateMatch[1],
+    startingTime: timeMatch[1],
+    initialized: initMatch ? initMatch[1].toLowerCase() === 'true' : false
+  };
+}
+
+/**
+ * Initialize card title map for O(1) lookups
+ * Cache invalidates each turn via info.actionCount
+ */
+function initCardTitleMap() {
+  if (!state._cardTitleMap || state._cardTitleMapTurn !== info.actionCount) {
+    state._cardTitleMap = {};
+    state._cardTitleMapTurn = info.actionCount;
+    for (let i = 0; i < storyCards.length; i++) {
+      const card = storyCards[i];
+      if (card && card.title) {
+        state._cardTitleMap[card.title.toLowerCase()] = card;
+      }
+    }
+  }
+}
+
+/**
+ * Find card by title with O(1) lookup
+ * @param {string} title - Card title to find
+ * @returns {Object|null} Card or null
+ */
+function findCardByTitle(title) {
+  if (!title) return null;
+  initCardTitleMap();
+  return state._cardTitleMap[title.toLowerCase()] || null;
 }
 
 // Map for descriptive time expressions

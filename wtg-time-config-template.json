@@ -1,0 +1,10 @@
+[
+  {
+    "keys": "",
+    "value": "Starting Date: 01/01/2024\nStarting Time: 12:00 PM\nInitialized: true",
+    "type": "system",
+    "title": "WTG Time Config",
+    "description": "Pre-configured starting time for World Time Generator. Edit Starting Date and Starting Time below.",
+    "useForCharacterCreation": false
+  }
+]
