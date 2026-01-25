@@ -48,6 +48,8 @@ const modifier = (text) => {
             state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
             if (timeStr) {
               state.startingTime = normalizeTime(timeStr);
+            } else {
+              state.startingTime = 'Unknown';
             }
             state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
             const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
