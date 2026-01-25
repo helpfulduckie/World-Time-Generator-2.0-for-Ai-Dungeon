@@ -36,7 +36,9 @@ const modifier = (text) => {
           if (isValidDate(month, day, year)) {
             // Set the starting date and time
             state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
-            state.startingTime = normalizeTime(timeStr);
+            if (timeStr) {
+              state.startingTime = normalizeTime(timeStr);
+            }
             state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
             const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
             state.currentDate = currentDate;
