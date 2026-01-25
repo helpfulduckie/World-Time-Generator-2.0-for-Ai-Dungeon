@@ -2,7 +2,7 @@
 
 > Advanced time tracking and entity management system for AI Dungeon scenarios
 
-# Latest version: 2.1.24
+# Latest version: 2.1.25
 
 Now with automatic storycard [settime] detection! Pre-configure your scenario's starting time without requiring players to manually enter commands by simply putting the [settime] command in any storycard within your scenario. The command will automatically be removed from the storycard.
 
@@ -58,6 +58,30 @@ You can also add `[settime]` directly into any storycard entry! When the scenari
 [settime 12/25/2024 6:00 am]
 It's Christmas morning in Victorian London...
 ```
+
+**NEW: WTG Time Config Card (v2.1.25) - For Large Scenarios**
+
+For scenarios with hundreds of storycards (900+), embedding `[settime]` in storycards can cause performance issues because the script must scan all cards to find the command. Instead, import the **WTG Time Config** storycard for instant O(1) time initialization.
+
+**How to use:**
+1. Import `wtg-time-config-template.json` into your scenario's storycards
+2. Edit the "WTG Time Config" card to set your desired starting date and time
+3. The script will read time directly from this card without scanning other storycards
+
+**Template format:**
+```json
+{
+  "title": "WTG Time Config",
+  "value": "Starting Date: 01/01/2024\nStarting Time: 12:00 PM\nInitialized: true",
+  "type": "system"
+}
+```
+
+**Benefits:**
+- O(1) lookup instead of O(n) storycard scan
+- Essential for scenarios with 500+ storycards
+- Easy to edit directly in AI Dungeon
+- Backwards compatible (old scenarios still work)
 
 #### `[advance N unit]`
 **Jump forward in time**
@@ -267,7 +291,7 @@ The Scenario version is just a convient way for mobile users to switch between e
 
 ## WTG 2.0 (Full Version)
 
-**Current Version**: 2.1.24
+**Current Version**: 2.1.25
 
 ### Features
 
@@ -497,6 +521,20 @@ Result: Switches back to lightweight for faster processing
 - **For Mode Switching**: Use files from the `wtg_2.0_scenario/` directory
 - **Don't Mix**: Never mix scripts from different versions
 
+### For Large Scenarios (500+ Storycards)
+
+If your scenario has hundreds of storycards, import the **WTG Time Config** card to avoid performance issues:
+
+1. Download `wtg-time-config-template.json` from this repository
+2. Import it into your scenario's storycards
+3. Edit the "WTG Time Config" card to set your starting date/time:
+   ```
+   Starting Date: 06/15/2023
+   Starting Time: 8:00 AM
+   Initialized: true
+   ```
+4. The script will read time from this card instantly (no scanning required)
+
 ---
 
 ## Quick Start Guide
@@ -578,6 +616,8 @@ After setup:
 │
 ├── Backup\                           # Version backups
 │   └── [various backup folders]
+│
+├── wtg-time-config-template.json     # Pre-import config card for large scenarios
 │
 └── README.md                         # This file
 ```
