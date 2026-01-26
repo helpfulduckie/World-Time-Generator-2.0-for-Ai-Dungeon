@@ -72,13 +72,13 @@ const modifier = (text) => {
     // Check if this is NOT a command (doesn't start with [something])
     const trimmedText = text.trim();
     if (!trimmedText.match(/^\[.+?\]/)) {
-      // User is doing a regular action without having set time - auto-set IRL time directly
+      // User is doing a regular action without having set time - auto-set IRL date with default time
       const now = new Date();
       const month = now.getMonth() + 1;
       const day = now.getDate();
       const year = now.getFullYear();
       state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
-      state.startingTime = normalizeTime(now.toLocaleTimeString('en-US').toLowerCase());
+      state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
       state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
       const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
       state.currentDate = currentDate;

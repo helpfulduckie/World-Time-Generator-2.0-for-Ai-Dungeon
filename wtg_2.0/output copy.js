@@ -130,6 +130,29 @@ const modifier = (text) => {
     }
   }
 
+  // Fallback auto-IRL-time for "continue" actions (onInput may not run for these)
+  if (state.initialMessageShown && !state.settimeInitialized &&
+      state.startingDate === '01/01/1900' && info.actionCount > 1) {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    const year = now.getFullYear();
+
+    state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+    state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
+    state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+    const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+    state.currentDate = currentDate;
+    state.currentTime = currentTime;
+    markSettimeAsInitialized();
+    updateDateTimeCard();
+    getWTGSettingsCard();
+    getCooldownCard();
+    getWTGCommandsCard();
+    getWTGDataCard();
+    state.changed = true;
+  }
+
   // If settime has NOT been initialized and we're at the start, inject the prompt
   if (!hasSettimeBeenInitialized() && state.startingDate === '01/01/1900' && state.startingTime === 'Unknown') {
     state.initialMessageShown = true;
@@ -893,14 +916,8 @@ const modifier = (text) => {
     }
   }
   
-  // Check if we should update storycards with timestamps for newly mentioned elements
-  if (lastAction) {
-    // Update timestamp for Current Date and Time card
-    const dateTimeCard = storyCards.find(card => card.title === "Current Date and Time");
-    if (dateTimeCard) {
-      addTimestampToCard(dateTimeCard, `${state.currentDate} ${state.currentTime}`);
-    }
-  }
+  // Note: Current Date and Time card is updated via updateDateTimeCard() below, not here
+  // (It's a system card that displays time directly, not a discovery card)
 
   // Update the Current Date and Time storycard if needed
   if (state.changed || info.actionCount === 1 || info.actionCount % 5 === 0) {
