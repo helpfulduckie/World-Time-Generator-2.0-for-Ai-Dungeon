@@ -40,7 +40,8 @@ const modifier = (text) => {
   }
 
   // Check for WTG Time Config card FIRST (O(1) lookup - no scanning needed)
-  if (state.startingDate === '01/01/1900' && info.actionCount <= 1) {
+  // Check whenever time hasn't been initialized yet (removed actionCount restriction)
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
     const timeConfig = parseWTGTimeConfig();
     if (timeConfig && timeConfig.initialized) {
       // Use config card values directly - skip full storycard scan
@@ -237,14 +238,14 @@ const modifier = (text) => {
 
       const combinedText = (lastAction ? lastAction.text : '') + ' ' + modifiedText;
 
-      // Limit storycard processing for performance (scenarios with 900+ cards)
-      const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
-      for (let i = 0; i < maxCards; i++) {
+      for (let i = 0; i < storyCards.length; i++) {
         const card = storyCards[i];
-        if (!card) continue;
 
-        // Skip system cards and Inner-Self cards (O(1) Set lookup)
-        if (SYSTEM_CARD_TITLES.has(card.title) ||
+        // Skip system cards and Inner-Self cards
+        if (card.title === "WTG Data" || card.title === "Current Date and Time" ||
+            card.title === "World Time Generator Settings" || card.title === "WTG Cooldowns" ||
+            card.title === "WTG Exclusions" || card.title === "Configure Inner Self" ||
+            card.title === "Configure Auto-Cards" || card.title === "Debug Data" ||
             (card.title && card.title.toLowerCase().includes("brain"))) {
           continue;
         }

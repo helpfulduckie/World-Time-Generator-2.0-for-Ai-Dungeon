@@ -37,7 +37,8 @@ const modifier = (text) => {
   }
 
   // Check for WTG Time Config card FIRST (O(1) lookup - no scanning needed)
-  if (state.startingDate === '01/01/1900' && info.actionCount <= 1) {
+  // Check whenever time hasn't been initialized yet (removed actionCount restriction)
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
     const timeConfig = parseWTGTimeConfig();
     if (timeConfig && timeConfig.initialized) {
       // Use config card values directly - skip full storycard scan
