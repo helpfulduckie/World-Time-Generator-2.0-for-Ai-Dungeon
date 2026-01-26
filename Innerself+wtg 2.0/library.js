@@ -1,4 +1,6 @@
-// Your "Library" tab should look like this
+// ========== INNER SELF + WTG 2.0 - LIBRARY SCRIPT ==========
+// Paste this ONLY into the LIBRARY tab in AI Dungeon scripting
+// ============================================================
 
 /**
  * Main control panel for scenario creator convenience

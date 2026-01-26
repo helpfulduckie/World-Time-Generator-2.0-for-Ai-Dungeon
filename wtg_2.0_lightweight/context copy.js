@@ -1,3 +1,7 @@
+// ========== WTG 2.0 LIGHTWEIGHT - CONTEXT SCRIPT ==========
+// Paste this ONLY into the CONTEXT tab in AI Dungeon scripting
+// ===========================================================
+
 // context.js - Handle context modifications and time adjustments for WTG Lightweight
 
 const modifier = (text) => {

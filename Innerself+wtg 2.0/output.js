@@ -1,4 +1,7 @@
-// Your "Output" tab should look like this
+// ========== INNER SELF + WTG 2.0 - OUTPUT SCRIPT ==========
+// Paste this ONLY into the OUTPUT tab in AI Dungeon scripting
+// ===========================================================
+
 // Combined Inner-Self + WTG Lightweight
 
 // Performance safeguard: limit storycard processing for scenarios with many cards

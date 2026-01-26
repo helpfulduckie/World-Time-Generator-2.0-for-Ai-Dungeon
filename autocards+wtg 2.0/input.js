@@ -1,3 +1,7 @@
+// ========== AUTOCARDS + WTG 2.0 - INPUT SCRIPT ==========
+// Paste this ONLY into the INPUT tab in AI Dungeon scripting
+// =========================================================
+
 // input.js - Combined WTG 2.0 Lightweight + AutoCards input processing
 // WTG runs first for time consistency, then AutoCards processes the result
 

@@ -1,3 +1,7 @@
+// ========== WTG 2.0 SCENARIO - LIBRARY SCRIPT ==========
+// Paste this ONLY into the LIBRARY tab in AI Dungeon scripting
+// ==========================================================
+
 // library.js - Core time management functions for WTG with mode switching (Normal/Lightweight)
 // This library supports both Normal mode (full features) and Lightweight mode (minimal features)
 

@@ -1,3 +1,7 @@
+// ========== WTG 2.0 SCENARIO - INPUT SCRIPT ==========
+// Paste this ONLY into the INPUT tab in AI Dungeon scripting
+// ======================================================
+
 // input.js - Handle user commands and process player actions for WTG with mode switching
 
 const modifier = (text) => {
