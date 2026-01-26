@@ -187,7 +187,9 @@ const modifier = (text) => {
   cleanupWTGDataCardByTimestamp(state.turnTime);
 
   // Clean up storycards with "Discovered on" timestamps higher than current time
-  cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+  if (state.currentDate && state.currentTime && state.currentDate !== '01/01/1900') {
+    cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+  }
 
   // Deprecate generated storycards that are no longer detected in the current story
   // Only run if card deletion is NOT disabled (false means depreciation is enabled)

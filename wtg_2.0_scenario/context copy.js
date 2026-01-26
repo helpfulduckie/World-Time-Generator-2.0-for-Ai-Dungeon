@@ -99,8 +99,10 @@ const modifier = (text) => {
     // Clean up WTG Data card by removing entries with timestamps higher than current turn time
     cleanupWTGDataCardByTimestamp(state.turnTime);
 
-    // Clean up storycards with future timestamps
-    cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+    // Clean up storycards with future timestamps (only if date/time are initialized)
+    if (state.currentDate && state.currentTime && state.currentDate !== '01/01/1900') {
+      cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+    }
 
     state.insertMarker = (charsAfter >= 7000);
 
@@ -272,7 +274,9 @@ const modifier = (text) => {
   cleanupWTGDataCardByTimestamp(state.turnTime);
 
   // Clean up storycards with "Discovered on" timestamps higher than current time
-  cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+  if (state.currentDate && state.currentTime && state.currentDate !== '01/01/1900') {
+    cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+  }
 
   // Deprecate generated storycards that are no longer detected in the current story
   const disableCardDeletion = getWTGBooleanSetting("Disable Generated Card Deletion");
