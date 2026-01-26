@@ -1,3 +1,7 @@
+// ========== AUTOCARDS + WTG 2.0 - OUTPUT SCRIPT ==========
+// Paste this ONLY into the OUTPUT tab in AI Dungeon scripting
+// ==========================================================
+
 // output.js - Combined WTG 2.0 Lightweight + AutoCards output processing
 // WTG runs first for time consistency, then AutoCards processes the result
 

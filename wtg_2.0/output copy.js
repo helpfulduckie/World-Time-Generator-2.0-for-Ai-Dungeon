@@ -1,3 +1,7 @@
+// ========== WTG 2.0 FULL - OUTPUT SCRIPT ==========
+// Paste this ONLY into the OUTPUT tab in AI Dungeon scripting
+// ===================================================
+
 // output.js - Handle AI responses and update storycards for the new WTG implementation
 
 // Performance safeguard: limit storycard processing for scenarios with many cards

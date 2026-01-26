@@ -1,3 +1,7 @@
+// ========== AUTOCARDS + WTG 2.0 - LIBRARY SCRIPT ==========
+// Paste this ONLY into the LIBRARY tab in AI Dungeon scripting
+// ===========================================================
+
 // library.js - Core time management functions for WTG Lightweight
 
 // Performance optimization: System card titles Set for O(1) lookups

@@ -1,3 +1,7 @@
+// ========== WTG 2.0 FULL - LIBRARY SCRIPT ==========
+// Paste this ONLY into the LIBRARY tab in AI Dungeon scripting
+// ====================================================
+
 // library.js - Core time management functions for the new WTG implementation
 
 // Performance optimization: System card titles Set for O(1) lookups

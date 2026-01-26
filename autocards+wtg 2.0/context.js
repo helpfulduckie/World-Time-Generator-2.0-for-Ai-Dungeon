@@ -1,3 +1,7 @@
+// ========== AUTOCARDS + WTG 2.0 - CONTEXT SCRIPT ==========
+// Paste this ONLY into the CONTEXT tab in AI Dungeon scripting
+// ===========================================================
+
 // context.js - Combined WTG 2.0 Lightweight + AutoCards context processing
 // WTG runs first for time consistency, then AutoCards processes the result
 

@@ -1,3 +1,7 @@
+// ========== WTG 2.0 FULL - INPUT SCRIPT ==========
+// Paste this ONLY into the INPUT tab in AI Dungeon scripting
+// ==================================================
+
 // input.js - Handle user commands and process player actions for the new WTG implementation
 
 const modifier = (text) => {

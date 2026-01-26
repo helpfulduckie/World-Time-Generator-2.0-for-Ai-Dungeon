@@ -1,3 +1,7 @@
+// ========== WTG 2.0 FULL - CONTEXT SCRIPT ==========
+// Paste this ONLY into the CONTEXT tab in AI Dungeon scripting
+// ====================================================
+
 // context.js - Handle context modifications and time adjustments for the new WTG implementation
 
 const modifier = (text) => {

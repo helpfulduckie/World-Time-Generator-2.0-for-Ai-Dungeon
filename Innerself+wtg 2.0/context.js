@@ -1,4 +1,7 @@
-// Your "Context" tab should look like this
+// ========== INNER SELF + WTG 2.0 - CONTEXT SCRIPT ==========
+// Paste this ONLY into the CONTEXT tab in AI Dungeon scripting
+// ============================================================
+
 // Combined Inner-Self + WTG Lightweight
 
 const modifier = (text) => {
