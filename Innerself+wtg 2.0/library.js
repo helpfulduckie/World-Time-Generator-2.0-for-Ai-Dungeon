@@ -802,6 +802,9 @@ function cleanupWTGDataCardByTimestamp(currentTT) {
   const dataCard = getWTGDataCard();
   if (!dataCard || !dataCard.entry) return;
 
+  // Preserve [SETTIME_INITIALIZED] marker when rebuilding entry
+  const hasInitMarker = dataCard.entry.includes('[SETTIME_INITIALIZED]');
+
   const turnDataRegex = /\[Turn Data\]\nAction Type: (.*?)\nAction Text: (.*?)\nResponse Text: (.*?)\nTimestamp: (.*?)\n\[\/Turn Data\]/gs;
   const matches = [...dataCard.entry.matchAll(turnDataRegex)];
 
@@ -831,7 +834,7 @@ Timestamp: ${match[4]}
     }
   }
 
-  dataCard.entry = newEntry;
+  dataCard.entry = (hasInitMarker ? '[SETTIME_INITIALIZED]\n' : '') + newEntry;
 
   // Invalidate turn data cache since we modified it
   invalidateTurnDataCache();

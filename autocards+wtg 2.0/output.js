@@ -43,6 +43,7 @@ const modifier = (text) => {
       state.currentDate = currentDate;
       state.currentTime = currentTime;
       state.changed = true;
+      state.settimeInitialized = true;
 
       // Initialize required system storycards
       updateDateTimeCard();
@@ -81,6 +82,7 @@ const modifier = (text) => {
               state.currentDate = currentDate;
               state.currentTime = currentTime;
               state.changed = true;
+              state.settimeInitialized = true;
 
               // Initialize required system storycards
               updateDateTimeCard();
@@ -248,7 +250,7 @@ const modifier = (text) => {
   modifiedText = narrative;
 
   // Add timestamps to existing storycards that don't have them
-  if (hasSettimeBeenInitialized()) {
+  if (state.settimeInitialized) {
     // Update timestamp for Current Date and Time card
     const dateTimeCard = storyCards.find(card => card.title === "Current Date and Time");
     if (dateTimeCard) {
