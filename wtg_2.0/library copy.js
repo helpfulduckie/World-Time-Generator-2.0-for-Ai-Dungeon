@@ -1846,7 +1846,7 @@ function getExclusionSet() {
     state._exclusionCacheKey = cacheKey;
     state._exclusionCacheTurn = info.actionCount;
   }
-  return state._exclusionSet;
+  return state._exclusionSet || new Set();
 }
 
 /**
