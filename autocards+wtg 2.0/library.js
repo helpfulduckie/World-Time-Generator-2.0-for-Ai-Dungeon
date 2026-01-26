@@ -4,6 +4,81 @@
 
 // library.js - Core time management functions for WTG Lightweight
 
+// Performance optimization: System card titles Set for O(1) lookups
+const SYSTEM_CARD_TITLES = new Set([
+  "WTG Data", "Current Date and Time", "World Time Generator Settings",
+  "WTG Cooldowns", "WTG Exclusions", "WTG Time Config",
+  "Configure Inner Self", "Configure Auto-Cards", "Debug Data"
+]);
+
+/**
+ * Get WTG Time Config card (pre-imported by user)
+ * Simple direct scan - no caching to avoid state serialization issues
+ * @returns {Object|null} Config card or null
+ */
+function getWTGTimeConfigCard() {
+  for (let i = 0; i < storyCards.length; i++) {
+    const card = storyCards[i];
+    if (card && card.title === "WTG Time Config") {
+      return card;
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse WTG Time Config card for starting date/time
+ * @returns {Object|null} Parsed config {startingDate, startingTime, initialized} or null
+ */
+function parseWTGTimeConfig() {
+  const configCard = getWTGTimeConfigCard();
+  if (!configCard) return null;
+
+  // AI Dungeon JSON exports use 'value', runtime uses 'entry'
+  const content = configCard.entry || configCard.value;
+  if (!content) return null;
+
+  const dateMatch = content.match(/Starting Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+  const timeMatch = content.match(/Starting Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+  const initMatch = content.match(/Initialized:\s*(true|false)/i);
+
+  if (!dateMatch || !timeMatch) return null;
+
+  return {
+    startingDate: dateMatch[1],
+    startingTime: timeMatch[1],
+    initialized: initMatch ? initMatch[1].toLowerCase() === 'true' : false
+  };
+}
+
+/**
+ * Initialize card title map for O(1) lookups
+ * Cache invalidates each turn via info.actionCount
+ */
+function initCardTitleMap() {
+  if (!state._cardTitleMap || state._cardTitleMapTurn !== info.actionCount) {
+    state._cardTitleMap = {};
+    state._cardTitleMapTurn = info.actionCount;
+    for (let i = 0; i < storyCards.length; i++) {
+      const card = storyCards[i];
+      if (card && card.title) {
+        state._cardTitleMap[card.title.toLowerCase()] = card;
+      }
+    }
+  }
+}
+
+/**
+ * Find card by title with O(1) lookup
+ * @param {string} title - Card title to find
+ * @returns {Object|null} Card or null
+ */
+function findCardByTitle(title) {
+  if (!title) return null;
+  initCardTitleMap();
+  return state._cardTitleMap[title.toLowerCase()] || null;
+}
+
 // Map for descriptive time expressions
 const descriptiveMap = new Map([
   ['morning', '8:00 AM'],
@@ -376,8 +451,9 @@ function compareTurnTime(tt1, tt2) {
  */
 function getTurnData() {
   const dataCard = getWTGDataCard();
-  if (!dataCard.entry) return [];
+  if (!dataCard || !dataCard.entry) return [];
 
+  // Direct parsing - no caching to avoid state serialization issues
   const turnDataRegex = /\[Turn Data\]\nAction Type: (.*?)\nAction Text: (.*?)\nResponse Text: (.*?)\nTimestamp: (.*?)\n\[\/Turn Data\]/gs;
   const matches = [...dataCard.entry.matchAll(turnDataRegex)];
 
@@ -419,7 +495,7 @@ Timestamp: ${timestamp}
  */
 function cleanupWTGDataCardByTimestamp(currentTT) {
   const dataCard = getWTGDataCard();
-  if (!dataCard.entry) return;
+  if (!dataCard || !dataCard.entry) return;
 
   const turnDataRegex = /\[Turn Data\]\nAction Type: (.*?)\nAction Text: (.*?)\nResponse Text: (.*?)\nTimestamp: (.*?)\n\[\/Turn Data\]/gs;
   const matches = [...dataCard.entry.matchAll(turnDataRegex)];
@@ -459,8 +535,13 @@ Timestamp: ${match[4]}
  * @param {string} currentTime - Current time string in hh:mm AM/PM format
  */
 function cleanupStoryCardsByTimestamp(currentDate, currentTime) {
+  // Defensive null checks
+  if (!currentDate || !currentTime || currentDate === '01/01/1900' || currentTime === 'Unknown') {
+    return;
+  }
   const currentDateTime = parseDateTime(currentDate, currentTime);
-  
+  if (!currentDateTime) return;
+
   // Iterate through storycards and remove future timestamps
   for (let i = storyCards.length - 1; i >= 0; i--) {
     const card = storyCards[i];
@@ -588,6 +669,13 @@ function getLastTurnTimeAndChars(history) {
  * @returns {Date} Date object
  */
 function parseDateTime(dateStr, timeStr) {
+  // Defensive null checks to prevent crashes
+  if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('/')) {
+    return null;
+  }
+  if (!timeStr || typeof timeStr !== 'string') {
+    return null;
+  }
   const [month, day, year] = dateStr.split('/').map(Number);
   const time = parseTime(timeStr);
   return new Date(year, month - 1, day, time.hour, time.min, time.sec);
@@ -598,10 +686,10 @@ function parseDateTime(dateStr, timeStr) {
  * @returns {Object} WTG Data storycard
  */
 function getWTGDataCard() {
+  // Direct lookup - no caching to avoid state serialization issues
   let dataCard = storyCards.find(card => card.title === "WTG Data");
   if (!dataCard) {
     addStoryCard("WTG Data");
-    // Find the newly created card
     dataCard = storyCards.find(card => card.title === "WTG Data");
     if (dataCard) {
       dataCard.type = "system";
@@ -618,13 +706,16 @@ function getWTGDataCard() {
  * @returns {Object} Current Date and Time storycard
  */
 function getCurrentDateTimeCard() {
+  // Direct lookup - no caching to avoid state serialization issues
   let dateTimeCard = storyCards.find(card => card.title === "Current Date and Time");
   if (!dateTimeCard) {
     addStoryCard("Current Date and Time");
-    dateTimeCard = storyCards[storyCards.length - 1];
-    dateTimeCard.type = "event";
-    dateTimeCard.keys = "date,time,current date,current time,clock,hour";
-    dateTimeCard.description = "Commands:\n[settime mm/dd/yyyy time] - Set starting date and time\n[advance N [hours|days|months|years]] - Advance time/date\n[sleep] - Sleep to next morning\n[reset] - Reset to most recent mention in history";
+    dateTimeCard = storyCards.find(card => card.title === "Current Date and Time");
+    if (dateTimeCard) {
+      dateTimeCard.type = "event";
+      dateTimeCard.keys = "date,time,current date,current time,clock,hour";
+      dateTimeCard.description = "Commands:\n[settime mm/dd/yyyy time] - Set starting date and time\n[advance N [hours|days|months|years]] - Advance time/date\n[sleep] - Sleep to next morning\n[reset] - Reset to most recent mention in history";
+    }
   }
   return dateTimeCard;
 }
@@ -692,28 +783,31 @@ function hasTimestamp(card) {
  * @param {string} text - Text to search for keywords
  * @returns {boolean} True if any keyword from the card is found in the text
  */
+/**
+ * Check if any of a storycard's keywords are mentioned in the given text
+ * Uses cached compiled regex patterns for performance
+ * @param {Object} card - Storycard to check
+ * @param {string} text - Text to search for keywords
+ * @returns {boolean} True if any keyword from the card is found in the text
+ */
 function isCardKeywordMentioned(card, text) {
   if (!card || !card.keys || !text) return false;
-  
-  // Normalize text to lowercase for case-insensitive matching
-  const normalizedText = text.toLowerCase();
-  
-  // Split the keys by comma and check each one
-  const keys = card.keys.split(',').map(k => k.trim().toLowerCase());
-  
-  for (const key of keys) {
-    if (!key) continue;
-    
-    // Check if the key appears as a whole word in the text
-    // Use word boundaries to avoid partial matches
-    const keyRegex = new RegExp('\\b' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-    if (keyRegex.test(normalizedText)) {
-      return true;
+
+  // Build regex array for this card's keywords (no caching to avoid state serialization issues)
+  const keys = card.keys.split(',');
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i].trim().toLowerCase();
+    if (key) {
+      const regex = new RegExp('\\b' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      if (regex.test(text)) {
+        return true;
+      }
     }
   }
-  
+
   return false;
 }
+
 
 /**
  * Get the timestamp from a storycard
@@ -796,17 +890,20 @@ function calculateKeywordSimilarity(keywords1, keywords2) {
  * @returns {Object} WTG Settings storycard
  */
 function getWTGSettingsCard() {
+  // Direct lookup - no caching to avoid state serialization issues
   let settingsCard = storyCards.find(card => card.title === "World Time Generator Settings");
   if (!settingsCard) {
     addStoryCard("World Time Generator Settings");
-    settingsCard = storyCards[storyCards.length - 1];
-    settingsCard.type = "system";
-    settingsCard.keys = ""; // No keys - not included in AI context
-    settingsCard.description = "World Time Generator Settings - Edit the values below to configure the system.";
-    settingsCard.entry = `Time Duration Multiplier: 1.0
+    settingsCard = storyCards.find(card => card.title === "World Time Generator Settings");
+    if (settingsCard) {
+      settingsCard.type = "system";
+      settingsCard.keys = ""; // No keys - not included in AI context
+      settingsCard.description = "World Time Generator Settings - Edit the values below to configure the system.";
+      settingsCard.entry = `Time Duration Multiplier: 1.0
 Enable Dynamic Time: false
 Debug Mode: false
 Disable WTG Entirely: false`;
+    }
   } else {
     // Ensure keys are always empty
     settingsCard.keys = "";
@@ -819,13 +916,16 @@ Disable WTG Entirely: false`;
  * @returns {Object} WTG Cooldowns storycard
  */
 function getCooldownCard() {
+  // Direct lookup - no caching to avoid state serialization issues
   let cooldownCard = storyCards.find(card => card.title === "WTG Cooldowns");
   if (!cooldownCard) {
     addStoryCard("WTG Cooldowns");
-    cooldownCard = storyCards[storyCards.length - 1];
-    cooldownCard.type = "system";
-    cooldownCard.keys = ""; // Empty keys so it's not included in context
-    cooldownCard.description = "Internal cooldown tracking for AI commands; no keys; not included in context";
+    cooldownCard = storyCards.find(card => card.title === "WTG Cooldowns");
+    if (cooldownCard) {
+      cooldownCard.type = "system";
+      cooldownCard.keys = ""; // Empty keys so it's not included in context
+      cooldownCard.description = "Internal cooldown tracking for AI commands; no keys; not included in context";
+    }
   }
   return cooldownCard;
 }
@@ -835,6 +935,7 @@ function getCooldownCard() {
  * @returns {Object} WTG Exclusions storycard
  */
 function getWTGExclusionsCard() {
+  // Direct lookup - no caching to avoid state serialization issues
   let exclusionsCard = storyCards.find(card => card.title === "WTG Exclusions");
   if (!exclusionsCard) {
     addStoryCard("WTG Exclusions");
@@ -850,20 +951,34 @@ function getWTGExclusionsCard() {
 }
 
 /**
+ * Get or build cached exclusion Set for O(1) lookups
+ * Cache invalidates when exclusion card content changes
+ * @returns {Set} Set of lowercase excluded card titles
+ */
+function getExclusionSet() {
+  // Direct parsing - no caching to avoid state serialization issues with Set objects
+  const exclusionsCard = getWTGExclusionsCard();
+  const exclusionSet = new Set();
+
+  if (exclusionsCard?.entry) {
+    const exclusionRegex = /\[Exclusion\]\nCard Title: (.*?)\n\[\/Exclusion\]/gs;
+    const matches = [...exclusionsCard.entry.matchAll(exclusionRegex)];
+    for (const match of matches) {
+      exclusionSet.add(match[1].toLowerCase());
+    }
+  }
+
+  return exclusionSet;
+}
+
+/**
  * Check if a storycard is excluded from timestamp injection
  * @param {string} cardTitle - Title of the card to check
  * @returns {boolean} True if card is excluded
  */
 function isCardExcluded(cardTitle) {
   if (!cardTitle) return false;
-  const exclusionsCard = getWTGExclusionsCard();
-  if (!exclusionsCard || !exclusionsCard.entry) return false;
-
-  const lowerTitle = cardTitle.toLowerCase();
-  const exclusionRegex = /\[Exclusion\]\nCard Title: (.*?)\n\[\/Exclusion\]/gs;
-  const matches = [...exclusionsCard.entry.matchAll(exclusionRegex)];
-
-  return matches.some(match => match[1].toLowerCase() === lowerTitle);
+  return getExclusionSet().has(cardTitle.toLowerCase());
 }
 
 /**

@@ -24,6 +24,24 @@ const modifier = (text) => {
     state.currentDate = '01/01/1900';
     state.currentTime = 'Unknown';
     state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+    state.settimeInitialized = false;
+  }
+
+  // Check for WTG Time Config card to initialize state before processing commands
+  // This must happen in input.js because commands like [advance] run before output.js
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
+    const timeConfig = parseWTGTimeConfig();
+    if (timeConfig && timeConfig.initialized) {
+      state.startingDate = timeConfig.startingDate;
+      state.startingTime = timeConfig.startingTime;
+      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      state.currentDate = currentDate;
+      state.currentTime = currentTime;
+      // Mark settime as initialized (persists marker to WTG Data card)
+      markSettimeAsInitialized();
+      state.changed = true;
+    }
   }
 
   state.changed = state.changed || false;
@@ -58,6 +76,8 @@ const modifier = (text) => {
     }
       state.insertMarker = true;
       state.changed = true;
+      // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
+      state.turnTimeModifiedByCommand = true;
       setSleepCooldown({hours: 8});
       modifiedText = '';
     }
@@ -83,9 +103,11 @@ const modifier = (text) => {
             state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
             if (timeStr) {
               state.startingTime = normalizeTime(timeStr);
+            } else {
+              state.startingTime = 'Unknown';
             }
             state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-            const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+            const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
             state.currentDate = currentDate;
             state.currentTime = currentTime;
 
@@ -122,13 +144,15 @@ const modifier = (text) => {
             add.hours = amount;
           }
           state.turnTime = addToTurnTime(state.turnTime, add);
-          const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+          const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
           state.currentDate = currentDate;
           state.currentTime = currentTime;
           const ttMarker = formatTurnTime(state.turnTime);
           messages.push(`[SYSTEM] Advanced ${amount} ${unit}. New date/time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]. `);
           state.insertMarker = true;
           state.changed = true;
+          // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
+          state.turnTimeModifiedByCommand = true;
           setAdvanceCooldown({minutes: 5});
         }
       } else if (command === 'reset') {

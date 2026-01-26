@@ -2,7 +2,7 @@
 
 > Advanced time tracking and entity management system for AI Dungeon scenarios
 
-# Latest version: 2.1.24
+# Latest version: 2.1.25
 
 Now with automatic storycard [settime] detection! Pre-configure your scenario's starting time without requiring players to manually enter commands by simply putting the [settime] command in any storycard within your scenario. The command will automatically be removed from the storycard.
 
@@ -58,6 +58,30 @@ You can also add `[settime]` directly into any storycard entry! When the scenari
 [settime 12/25/2024 6:00 am]
 It's Christmas morning in Victorian London...
 ```
+
+**NEW: WTG Time Config Card (v2.1.25) - For Large Scenarios**
+
+For scenarios with hundreds of storycards (900+), embedding `[settime]` in storycards can cause performance issues because the script must scan all cards to find the command. Instead, import the **WTG Time Config** storycard for instant O(1) time initialization.
+
+**How to use:**
+1. Import `wtg-time-config-template.json` into your scenario's storycards
+2. Edit the "WTG Time Config" card to set your desired starting date and time
+3. The script will read time directly from this card without scanning other storycards
+
+**Template format:**
+```json
+{
+  "title": "WTG Time Config",
+  "value": "Starting Date: 01/01/2024\nStarting Time: 12:00 PM\nInitialized: true",
+  "type": "system"
+}
+```
+
+**Benefits:**
+- O(1) lookup instead of O(n) storycard scan
+- Essential for scenarios with 500+ storycards
+- Easy to edit directly in AI Dungeon
+- Backwards compatible (old scenarios still work)
 
 #### `[advance N unit]`
 **Jump forward in time**
@@ -213,9 +237,9 @@ Additional notes that should appear after the timestamp.
 
 **Overview**
 
-The regular version of WTG 2.0 was tested primarly using Deepseek v3.1, so this script performs best with that model. The lightweight model is primarly for llama and other smaller models, as they have a hard time doing instruction following. Mixtral models can also work with the normal wtg scripts, but I haven't done rigorous testing with those models.
+The regular version of WTG 2.0 was tested primarily using Deepseek v3.1, so this script performs best with that model. The lightweight version is primarily for Llama and other smaller models, as they have a hard time with instruction following. Mixtral models can also work with the normal WTG scripts, but I haven't done rigorous testing with those models.
 
-The Scenario version is just a convient way for mobile users to switch between either script. 
+The Scenario version is just a convenient way for mobile users to switch between either script. 
 
 ### Choose **WTG 2.0 (Full Version)** if you want:
 
@@ -267,7 +291,7 @@ The Scenario version is just a convient way for mobile users to switch between e
 
 ## WTG 2.0 (Full Version)
 
-**Current Version**: 2.1.24
+**Current Version**: 2.1.25
 
 ### Features
 
@@ -342,13 +366,13 @@ Disable WTG Entirely: false            # Emergency disable switch
 
 ## WTG 2.0 Lightweight
 
-**Current Version**: 1.0.3
+**Current Version**: 2.1.25
 
 ### Features
 
 #### Pure Time Tracking
 
-- **Fixed Rate**: 1 minute per 700 characters (not configurable)
+- **Base Rate**: 1 minute per 700 characters
 - **Automatic Timestamps**: All storycards get discovery timestamps
 - **No AI Prompts**: Zero interference with AI generation
 - **No Entity Features**: You create all storycards manually
@@ -476,6 +500,37 @@ Result: Switches back to lightweight for faster processing
 
 ---
 
+## Combined Versions
+
+### AutoCards + WTG 2.0 Lightweight
+
+Located in `autocards+wtg 2.0/`, this version combines WTG Lightweight time tracking with **AutoCards**, a separate storycard generation system by LewdLeah.
+
+**Features:**
+- WTG handles time tracking (same as Lightweight)
+- AutoCards automatically generates storycards from AI output
+- No parentheses markers needed - AutoCards uses its own detection
+- Includes memory compression and card cooldown settings
+
+**Best for:** Users who want automatic storycard generation without the parentheses-based entity system.
+
+### Inner Self + WTG 2.0 Lightweight
+
+Located in `Innerself+wtg 2.0/`, this version combines WTG Lightweight time tracking with **Inner Self**, a character simulation system by LewdLeah.
+
+**Features:**
+- WTG handles time tracking (same as Lightweight)
+- Inner Self grants NPCs private memory ("brains") stored in storycard notes
+- Characters learn, form opinions, and adapt behavior over time
+- Name-based triggers activate relevant NPC brains
+- Includes AutoCards integration (optional, disabled by default)
+
+**Best for:** Users who want NPCs with persistent memory and adaptive personalities.
+
+**Configuration:** Players configure via the "Configure Inner Self" storycard in-game.
+
+---
+
 ## Installation
 
 ### For AI Dungeon Web
@@ -495,7 +550,23 @@ Result: Switches back to lightweight for faster processing
 - **For Full Features**: Use files from the `wtg_2.0/` directory
 - **For Lightweight**: Use files from the `wtg_2.0_lightweight/` directory
 - **For Mode Switching**: Use files from the `wtg_2.0_scenario/` directory
+- **For AutoCards Integration**: Use files from the `autocards+wtg 2.0/` directory
+- **For Inner Self Integration**: Use files from the `Innerself+wtg 2.0/` directory
 - **Don't Mix**: Never mix scripts from different versions
+
+### For Large Scenarios (500+ Storycards)
+
+If your scenario has hundreds of storycards, import the **WTG Time Config** card to avoid performance issues:
+
+1. Download `wtg-time-config-template.json` from this repository
+2. Import it into your scenario's storycards
+3. Edit the "WTG Time Config" card to set your starting date/time:
+   ```
+   Starting Date: 06/15/2023
+   Starting Time: 8:00 AM
+   Initialized: true
+   ```
+4. The script will read time from this card instantly (no scanning required)
 
 ---
 
@@ -545,8 +616,8 @@ After setup:
 ### Using Scenario Version
 
 After setup:
-- **Default Mode**: Starts in Normal mode (full features)
-- **Switch Modes**: Use `[light]` for lightweight, `[normal]` for full features
+- **Default Mode**: Starts in Lightweight mode (minimal features)
+- **Switch Modes**: Use `[normal]` for full features, `[light]` for lightweight
 - **Combined Setup**: `[light] [settime 08/08/2022 6:00 am]` (set mode + time together)
 - **Mode Display**: Check "Current Date and Time" storycard for current mode
 - **Flexible Switching**: Change modes anytime during your adventure
@@ -555,34 +626,47 @@ After setup:
 ## File Structure
 
 ```
-├── wtg_2.0\                          # Full version
+├── wtg_2.0/                          # Full version
 │   ├── context copy.js               # AI instructions & time
 │   ├── input copy.js                 # Player commands & entities
 │   ├── output copy.js                # Entity detection & cards
 │   ├── library copy.js               # Core functions
 │   └── Documentation.md              # Detailed documentation
 │
-├── wtg_2.0_lightweight\              # Lightweight version
+├── wtg_2.0_lightweight/              # Lightweight version
 │   ├── context copy.js               # Time management only
 │   ├── input copy.js                 # Commands only
 │   ├── output copy.js                # Timestamps only
 │   ├── library copy.js               # Core functions
 │   └── Documentation.md              # Lightweight docs
 │
-├── wtg_2.0_scenario\                 # Mode switching version
+├── wtg_2.0_scenario/                 # Mode switching version
 │   ├── context copy.js               # Mode-aware AI instructions
 │   ├── input copy.js                 # Multi-command processing
 │   ├── output copy.js                # Mode-specific entity detection
 │   ├── library copy.js               # Combined functions
 │   └── Documentation.md              # Mode-switching docs
 │
-├── Backup\                           # Version backups
+├── autocards+wtg 2.0/                # WTG Lightweight + AutoCards
+│   ├── context.js                    # Combined context processing
+│   ├── input.js                      # Combined input processing
+│   ├── output.js                     # Combined output processing
+│   ├── library.js                    # WTG + AutoCards functions
+│   └── QUICKSTART.md                 # Quick start guide
+│
+├── Innerself+wtg 2.0/                # WTG Lightweight + Inner Self
+│   ├── context.js                    # Combined context processing
+│   ├── input.js                      # Combined input processing
+│   ├── output.js                     # Combined output processing
+│   └── library.js                    # WTG + Inner Self functions
+│
+├── Backup/                           # Version backups
 │   └── [various backup folders]
+│
+├── wtg-time-config-template.json     # Pre-import config card for large scenarios
 │
 └── README.md                         # This file
 ```
-
----
 
 ---
 

@@ -8,6 +8,11 @@ const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
+  // Initialize mode to normal (full version always uses normal mode)
+  if (!state.wtgMode) {
+    state.wtgMode = 'normal';
+  }
+
   // Check if WTG is disabled entirely
   if (getWTGBooleanSetting("Disable WTG Entirely")) {
     return {text: text};
@@ -23,6 +28,23 @@ const modifier = (text) => {
     state.settimeInitialized = false;
     if (!isLightweightMode()) {
       state.timeMultiplier = 1.0;
+    }
+  }
+
+  // Check for WTG Time Config card to initialize state before processing commands
+  // This must happen in input.js because commands like [advance] run before output.js
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
+    const timeConfig = parseWTGTimeConfig();
+    if (timeConfig && timeConfig.initialized) {
+      state.startingDate = timeConfig.startingDate;
+      state.startingTime = timeConfig.startingTime;
+      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      state.currentDate = currentDate;
+      state.currentTime = currentTime;
+      // Mark settime as initialized (persists marker to WTG Data card)
+      markSettimeAsInitialized();
+      state.changed = true;
     }
   }
 
@@ -65,9 +87,11 @@ const modifier = (text) => {
             state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
             if (timeStr) {
               state.startingTime = normalizeTime(timeStr);
+            } else {
+              state.startingTime = 'Unknown';
             }
             state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-            const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+            const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
             state.currentDate = currentDate;
             state.currentTime = currentTime;
 
@@ -110,7 +134,7 @@ const modifier = (text) => {
             add.hours = amount;
           }
           state.turnTime = addToTurnTime(state.turnTime, add);
-          const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+          const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
           state.currentDate = currentDate;
           state.currentTime = currentTime;
           const ttMarker = formatTurnTime(state.turnTime);
@@ -118,6 +142,8 @@ const modifier = (text) => {
           modifiedText = modifiedText.replace(bracketedCommand, '');
           state.insertMarker = true;
           state.changed = true;
+          // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
+          state.turnTimeModifiedByCommand = true;
           // Set advance cooldown to prevent AI from advancing again for 5 minutes
           setAdvanceCooldown({minutes: 5});
         }

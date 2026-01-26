@@ -57,6 +57,11 @@ const modifier = (text) => {
     const similarity1 = calculateKeywordSimilarity(lastKeywords, currentKeywords);
     const similarity2 = calculateKeywordSimilarity(secondLastKeywords, currentKeywords);
 
+    // Check if a command (advance/sleep) just modified turnTime - if so, skip recalculation
+    // The modified input isn't in history yet, so we'd incorrectly overwrite the command's value
+    const skipTimeRecalc = state.turnTimeModifiedByCommand;
+    delete state.turnTimeModifiedByCommand;
+
     // Get character count from history for time adjustment
     const {lastTT, charsAfter, found: markerFound} = getLastTurnTimeAndChars(history);
 
@@ -71,7 +76,10 @@ const modifier = (text) => {
 
     let additionalMinutes = 0;
 
-    if (useLastTTDirectly) {
+    if (skipTimeRecalc) {
+      // Command just set turnTime - don't overwrite it
+      // state.turnTime, currentDate, currentTime are already correct from input.js
+    } else if (useLastTTDirectly) {
       state.turnTime = lastTT;
       const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
       state.currentDate = currentDate;
@@ -124,8 +132,10 @@ const modifier = (text) => {
     // Clean up WTG Data card by removing entries with timestamps higher than current turn time
     cleanupWTGDataCardByTimestamp(state.turnTime);
 
-    // Clean up storycards with future timestamps
-    cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+    // Clean up storycards with future timestamps (only if date/time are initialized)
+    if (state.currentDate && state.currentTime && state.currentDate !== '01/01/1900') {
+      cleanupStoryCardsByTimestamp(state.currentDate, state.currentTime);
+    }
 
     state.insertMarker = (charsAfter >= 7000);
 

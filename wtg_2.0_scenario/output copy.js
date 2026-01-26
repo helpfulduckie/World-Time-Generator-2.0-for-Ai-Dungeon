@@ -4,6 +4,15 @@
 
 // output.js - Handle AI responses and update storycards for WTG with mode switching
 
+// Performance safeguard: limit storycard processing for scenarios with many cards
+const MAX_STORYCARDS_TO_PROCESS = 200;
+
+// System card titles Set for O(1) lookups
+const SYSTEM_CARD_TITLES = new Set([
+  "WTG Data", "Current Date and Time", "World Time Generator Settings",
+  "WTG Cooldowns", "WTG Exclusions", "WTG Time Config"
+]);
+
 const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
@@ -28,10 +37,44 @@ const modifier = (text) => {
     }
   }
 
-  // Check for [settime] command in storycards at scenario start
-  if (state.startingDate === '01/01/1900' && info.actionCount <= 1) {
-    // Scan all storycards for [settime] commands
-    for (const card of storyCards) {
+  // Check for WTG Time Config card FIRST (O(1) lookup - no scanning needed)
+  // Check whenever time hasn't been initialized yet (removed actionCount restriction)
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
+    const timeConfig = parseWTGTimeConfig();
+    if (timeConfig && timeConfig.initialized) {
+      // Use config card values directly - skip full storycard scan
+      state.startingDate = timeConfig.startingDate;
+      state.startingTime = timeConfig.startingTime;
+      // Don't reset turnTime if it was already set by a command in input.js
+      // This fixes [advance]/[sleep] being overwritten when using WTG Time Config card
+      if (!state.turnTimeModifiedByCommand) {
+        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      }
+      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      state.currentDate = currentDate;
+      state.currentTime = currentTime;
+      state.changed = true;
+
+      // Mark settime as initialized since we got it from config card
+      markSettimeAsInitialized();
+
+      // Initialize required system storycards
+      updateDateTimeCard();
+      getWTGSettingsCard();
+      getCooldownCard();
+      if (!isLightweightMode()) {
+        getWTGDataCard();
+      }
+    }
+  }
+
+  // Fallback: Check for [settime] command in storycards at scenario start
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized && info.actionCount <= 1) {
+    // Scan storycards for [settime] commands (limited for performance)
+    const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+    for (let i = 0; i < maxCards; i++) {
+      const card = storyCards[i];
+      if (!card) continue;
       if (card.entry) {
         // Match [settime date time] format - handle both "mm/dd/yyyy" and variations
         const settimeMatch = card.entry.match(/\[settime\s+(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\s+(.+?)\]/i);
@@ -51,7 +94,10 @@ const modifier = (text) => {
             // Set the starting date and time
             state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
             state.startingTime = normalizeTime(timeStr);
-            state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+            // Don't reset turnTime if it was already set by a command in input.js
+            if (!state.turnTimeModifiedByCommand) {
+              state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+            }
             const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
             state.currentDate = currentDate;
             state.currentTime = currentTime;
@@ -104,13 +150,10 @@ const modifier = (text) => {
     }
 
     // Process any existing turn time marker in the text
+    // NOTE: Time calculation is handled in context.js - do NOT recalculate here
     const ttMatch = modifiedText.match(/\[\[(.*?)\]\]$/);
     let parsedTT = ttMatch ? parseTurnTime(ttMatch[1]) : null;
     let narrative = ttMatch ? modifiedText.replace(/\[\[.*\]\]$/, '').trim() : modifiedText.trim();
-    let charCount = narrative.length;
-
-    // Calculate minutes to add based on character count (fixed rate: 1 minute per 700 characters)
-    let minutesToAdd = Math.floor(charCount / 700);
 
     // Add warning if AI altered turn time metadata
     if (parsedTT) {
@@ -120,17 +163,8 @@ const modifier = (text) => {
       }
     }
 
-    // Update turn time based on character count if starting time is not descriptive
-    if (state.startingTime !== 'Unknown' && minutesToAdd > 0) {
-      state.turnTime = addToTurnTime(state.turnTime, {minutes: minutesToAdd});
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
-      state.currentDate = currentDate;
-      state.currentTime = currentTime;
-    state.changed = true;
-  }
-
-  // Update text without turn time marker
-  modifiedText = narrative;
+    // Update text without turn time marker
+    modifiedText = narrative;
 
     // Add timestamps to existing storycards that don't have them
     if (hasSettimeBeenInitialized()) {
@@ -142,10 +176,13 @@ const modifier = (text) => {
       // Combine the player's action and AI's output for keyword detection
       const combinedText = (lastAction ? lastAction.text : '') + ' ' + modifiedText;
 
-      for (let i = 0; i < storyCards.length; i++) {
+      // Limit storycard processing for performance (scenarios with many cards)
+      const maxTimestampCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+      for (let i = 0; i < maxTimestampCards; i++) {
         const card = storyCards[i];
+        if (!card) continue;
         // Skip system cards
-        if (card.title === "WTG Data" || card.title === "Current Date and Time" || card.title === "World Time Generator Settings" || card.title === "WTG Cooldowns" || card.title === "WTG Exclusions") {
+        if (SYSTEM_CARD_TITLES.has(card.title)) {
           continue;
         }
         // Process [e] marker - removes marker and adds card to exclusions list
@@ -162,7 +199,10 @@ const modifier = (text) => {
     // Add turn data to WTG Data storycard if we found a player action and it's not a continue
     if (lastAction && actionType !== "continue") {
       const timestamp = formatTurnTime(state.turnTime);
-      addTurnData(actionType, lastAction.text, timestamp);
+      // Extract first two sentences of AI response for responseText
+      const firstTwoSentences = narrative.match(/^[^.!?]*[.!?][^.!?]*[.!?]/) || [narrative.substring(0, 200)];
+      const responseText = firstTwoSentences[0].trim();
+      addTurnData(actionType, lastAction.text, timestamp, responseText);
     }
 
     // Update the Current Date and Time storycard if needed
@@ -172,6 +212,8 @@ const modifier = (text) => {
     }
 
     delete state.insertMarker;
+    // Clean up the command flag (set by input.js, used by context.js and output.js)
+    delete state.turnTimeModifiedByCommand;
 
     return {text: ensureLeadingSpace(modifiedText)};
   }
@@ -557,8 +599,11 @@ const modifier = (text) => {
     // Combine the player's action and AI's output for keyword detection
     const combinedText = (lastAction ? lastAction.text : '') + ' ' + modifiedText;
 
-    for (let i = 0; i < storyCards.length; i++) {
+    // Limit storycard processing for performance (scenarios with many cards)
+    const maxTimestampCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+    for (let i = 0; i < maxTimestampCards; i++) {
       const card = storyCards[i];
+      if (!card) continue;
       if (card.title === "WTG Data" || card.title === "Current Date and Time" || card.title === "World Time Generator Settings" || card.title === "WTG Cooldowns" || card.title === "WTG Exclusions") {
         continue;
       }
@@ -586,6 +631,8 @@ const modifier = (text) => {
   }
 
   delete state.insertMarker;
+  // Clean up the command flag (set by input.js, used by context.js and output.js)
+  delete state.turnTimeModifiedByCommand;
 
   // Ensure the modified text starts with a space
   modifiedText = ensureLeadingSpace(modifiedText);

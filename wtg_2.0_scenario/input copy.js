@@ -136,6 +136,8 @@ const modifier = (text) => {
           messages.push(`[SYSTEM] Advanced ${amount} ${unit}${extraMinutes ? ` and ${extraMinutes} minutes` : ''}. New date/time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
           state.insertMarker = true;
           state.changed = true;
+          // Flag to prevent context.js from overwriting turnTime (new input isn't in history yet)
+          state.turnTimeModifiedByCommand = true;
           // Set advance cooldown to prevent AI from advancing again for 5 minutes (Normal mode only)
           if (!isLightweightMode()) {
             setAdvanceCooldown({minutes: 5});
