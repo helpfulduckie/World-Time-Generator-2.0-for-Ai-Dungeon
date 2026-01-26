@@ -83,11 +83,9 @@ const modifier = (text) => {
             state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
             if (timeStr) {
               state.startingTime = normalizeTime(timeStr);
-            } else {
-              state.startingTime = 'Unknown';
             }
             state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-            const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+            const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
             state.currentDate = currentDate;
             state.currentTime = currentTime;
 
@@ -124,7 +122,7 @@ const modifier = (text) => {
             add.hours = amount;
           }
           state.turnTime = addToTurnTime(state.turnTime, add);
-          const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+          const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
           state.currentDate = currentDate;
           state.currentTime = currentTime;
           const ttMarker = formatTurnTime(state.turnTime);

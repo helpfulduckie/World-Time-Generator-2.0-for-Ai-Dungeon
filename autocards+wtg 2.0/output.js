@@ -5,22 +5,10 @@
 // output.js - Combined WTG 2.0 Lightweight + AutoCards output processing
 // WTG runs first for time consistency, then AutoCards processes the result
 
-// Performance safeguard: limit storycard processing for scenarios with many cards
-const MAX_STORYCARDS_TO_PROCESS = 200;
-
 const modifier = (text) => {
   // ============ WTG PROCESSING FIRST ============
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-
-  // Initialize date/time state if not present (mirrors input.js initialization)
-  if (state.startingDate === undefined) {
-    state.startingDate = '01/01/1900';
-    state.startingTime = 'Unknown';
-    state.currentDate = '01/01/1900';
-    state.currentTime = 'Unknown';
-    state.settimeInitialized = false;
-  }
 
   let modifiedText = text;
 
@@ -30,70 +18,46 @@ const modifier = (text) => {
     return {text: ensureLeadingSpace(modifiedText)};
   }
 
-  // Check for WTG Time Config card FIRST (O(1) lookup - no scanning needed)
-  // Check whenever time hasn't been initialized yet (removed actionCount restriction)
-  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
-    const timeConfig = parseWTGTimeConfig();
-    if (timeConfig && timeConfig.initialized) {
-      // Use config card values directly - skip full storycard scan
-      state.startingDate = timeConfig.startingDate;
-      state.startingTime = timeConfig.startingTime;
-      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
-      state.currentDate = currentDate;
-      state.currentTime = currentTime;
-      state.changed = true;
+  // Check for [settime] command in storycards at scenario start
+  if (state.startingDate === '01/01/1900' && info.actionCount <= 1) {
+    // Scan all storycards for [settime] commands
+    for (const card of storyCards) {
+      if (card.entry) {
+        // Match [settime date time] format - handle both "mm/dd/yyyy" and variations
+        const settimeMatch = card.entry.match(/\[settime\s+(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\s+(.+?)\]/i);
+        if (settimeMatch) {
+          let dateStr = settimeMatch[1];
+          let timeStr = settimeMatch[2].trim();
+          
+          // Normalize date separators
+          dateStr = dateStr.replace(/[.-]/g, '/');
+          let [part1, part2, year] = dateStr.split('/').map(Number);
+          if (year < 100) year += 2000;
+          let month = part1;
+          let day = part2;
+          if (month > 12 && day <= 12) [month, day] = [day, part1];
+          
+          if (isValidDate(month, day, year)) {
+            // Set the starting date and time
+            state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+            state.startingTime = normalizeTime(timeStr);
+            state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+            const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+            state.currentDate = currentDate;
+            state.currentTime = currentTime;
+            state.changed = true;
 
-      // Initialize required system storycards
-      updateDateTimeCard();
-      getWTGSettingsCard();
-      getCooldownCard();
-    } else {
-      // Fall back: Scan storycards for [settime] commands (limited for performance)
-      const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
-      for (let i = 0; i < maxCards; i++) {
-        const card = storyCards[i];
-        if (card && card.entry) {
-          // Match [settime date time] format - handle both "mm/dd/yyyy" and variations
-          const settimeMatch = card.entry.match(/\[settime\s+(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\s+(.+?)\]/i);
-          if (settimeMatch) {
-            let dateStr = settimeMatch[1];
-            let timeStr = settimeMatch[2].trim();
+            // Initialize required system storycards
+            updateDateTimeCard();
+            getWTGSettingsCard();
+            getCooldownCard();
 
-            // Normalize date separators
-            dateStr = dateStr.replace(/[.-]/g, '/');
-            let [part1, part2, year] = dateStr.split('/').map(Number);
-            if (year < 100) year += 2000;
-            let month = part1;
-            let day = part2;
-            if (month > 12 && day <= 12) [month, day] = [day, part1];
+            // Remove the [settime] command from the storycard
+            card.entry = card.entry.replace(/\[settime\s+\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}\s+.+?\]/i, '').trim();
 
-            if (isValidDate(month, day, year)) {
-              // Set the starting date and time
-              state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
-              if (timeStr) {
-                state.startingTime = normalizeTime(timeStr);
-              } else {
-                state.startingTime = 'Unknown';
-              }
-              state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-              const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
-              state.currentDate = currentDate;
-              state.currentTime = currentTime;
-              state.changed = true;
-
-              // Initialize required system storycards
-              updateDateTimeCard();
-              getWTGSettingsCard();
-              getCooldownCard();
-
-              // Remove the [settime] command from the storycard
-              card.entry = card.entry.replace(/\[settime\s+\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}\s+.+?\]/i, '').trim();
-
-              // Skip the opening prompt and let AI respond
-              // Don't return here, just continue to normal processing
-              break;
-            }
+            // Skip the opening prompt and let AI respond
+            // Don't return here, just continue to normal processing
+            break;
           }
         }
       }
@@ -259,14 +223,11 @@ const modifier = (text) => {
     const combinedText = (lastAction ? lastAction.text : '') + ' ' + modifiedText;
 
     // Add timestamps to storycards that don't have them but whose keywords were mentioned
-    // Limit storycard processing for performance (scenarios with 900+ cards)
-    const maxTimestampCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
-    for (let i = 0; i < maxTimestampCards; i++) {
+    for (let i = 0; i < storyCards.length; i++) {
       const card = storyCards[i];
-      if (!card) continue;
 
-      // Skip system cards (O(1) Set lookup)
-      if (SYSTEM_CARD_TITLES.has(card.title)) {
+      // Skip system cards
+      if (card.title === "WTG Data" || card.title === "Current Date and Time" || card.title === "World Time Generator Settings" || card.title === "WTG Exclusions") {
         continue;
       }
 

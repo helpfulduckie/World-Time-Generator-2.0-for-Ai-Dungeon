@@ -5,128 +5,6 @@
 // library.js - Core time management functions for WTG with mode switching (Normal/Lightweight)
 // This library supports both Normal mode (full features) and Lightweight mode (minimal features)
 
-// Performance optimization: System card titles Set for O(1) lookups
-const SYSTEM_CARD_TITLES = new Set([
-  "WTG Data", "Current Date and Time", "World Time Generator Settings",
-  "WTG Cooldowns", "WTG Exclusions", "WTG Time Config",
-  "Configure Inner Self", "Configure Auto-Cards", "Debug Data"
-]);
-
-/**
- * Initialize system card cache for current turn
- * Cache invalidates each turn via info.actionCount
- */
-function initSystemCardCache() {
-  if (!state._sysCardCache || state._sysCardCacheTurn !== info.actionCount) {
-    state._sysCardCache = {};
-    state._sysCardCacheTurn = info.actionCount;
-    // Build cache in single pass
-    for (let i = 0; i < storyCards.length; i++) {
-      const card = storyCards[i];
-      if (card && card.title && SYSTEM_CARD_TITLES.has(card.title)) {
-        state._sysCardCache[card.title] = card;
-      }
-    }
-  }
-}
-
-/**
- * Get cached system card or null if not found
- * @param {string} title - Card title to look up
- * @returns {Object|null} Cached card or null
- */
-function getCachedSystemCard(title) {
-  initSystemCardCache();
-  return state._sysCardCache[title] || null;
-}
-
-/**
- * Add newly created card to cache
- * @param {string} title - Card title
- * @param {Object} card - Card object
- */
-function addToSystemCardCache(title, card) {
-  initSystemCardCache();
-  if (SYSTEM_CARD_TITLES.has(title)) {
-    state._sysCardCache[title] = card;
-  }
-}
-
-/**
- * Get WTG Time Config card (pre-imported by user)
- * Uses cache first, falls back to direct scan
- * @returns {Object|null} Config card or null
- */
-function getWTGTimeConfigCard() {
-  // Try cache first
-  const cached = getCachedSystemCard("WTG Time Config");
-  if (cached) return cached;
-
-  // Fallback: direct scan (in case cache missed it)
-  for (let i = 0; i < storyCards.length; i++) {
-    const card = storyCards[i];
-    if (card && card.title === "WTG Time Config") {
-      // Add to cache for future lookups
-      addToSystemCardCache("WTG Time Config", card);
-      return card;
-    }
-  }
-  return null;
-}
-
-/**
- * Parse WTG Time Config card for starting date/time
- * @returns {Object|null} Parsed config {startingDate, startingTime, initialized} or null
- */
-function parseWTGTimeConfig() {
-  const configCard = getWTGTimeConfigCard();
-  if (!configCard) return null;
-
-  // AI Dungeon JSON exports use 'value', runtime uses 'entry'
-  const content = configCard.entry || configCard.value;
-  if (!content) return null;
-
-  const dateMatch = content.match(/Starting Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
-  const timeMatch = content.match(/Starting Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
-  const initMatch = content.match(/Initialized:\s*(true|false)/i);
-
-  if (!dateMatch || !timeMatch) return null;
-
-  return {
-    startingDate: dateMatch[1],
-    startingTime: timeMatch[1],
-    initialized: initMatch ? initMatch[1].toLowerCase() === 'true' : false
-  };
-}
-
-/**
- * Initialize card title map for O(1) lookups
- * Cache invalidates each turn via info.actionCount
- */
-function initCardTitleMap() {
-  if (!state._cardTitleMap || state._cardTitleMapTurn !== info.actionCount) {
-    state._cardTitleMap = {};
-    state._cardTitleMapTurn = info.actionCount;
-    for (let i = 0; i < storyCards.length; i++) {
-      const card = storyCards[i];
-      if (card && card.title) {
-        state._cardTitleMap[card.title.toLowerCase()] = card;
-      }
-    }
-  }
-}
-
-/**
- * Find card by title with O(1) lookup
- * @param {string} title - Card title to find
- * @returns {Object|null} Card or null
- */
-function findCardByTitle(title) {
-  if (!title) return null;
-  initCardTitleMap();
-  return state._cardTitleMap[title.toLowerCase()] || null;
-}
-
 // Map for descriptive time expressions
 const descriptiveMap = new Map([
   ['morning', '8:00 AM'],
@@ -625,7 +503,7 @@ function calculateKeywordSimilarity(keywords1, keywords2) {
  * @returns {Object} WTG Data storycard
  */
 function getWTGDataCard() {
-  let dataCard = getCachedSystemCard("WTG Data");
+  let dataCard = storyCards.find(card => card.title === "WTG Data");
   if (!dataCard) {
     addStoryCard("WTG Data");
     // Find the newly created card
@@ -635,7 +513,6 @@ function getWTGDataCard() {
       dataCard.keys = "wtg_internal_data,do_not_include_in_context";
       dataCard.entry = "";
       dataCard.description = "System data for World Time Generator - Internal use only, do not include in context";
-      addToSystemCardCache("WTG Data", dataCard);
     }
   }
   return dataCard;
@@ -646,14 +523,13 @@ function getWTGDataCard() {
  * @returns {Object} Current Date and Time storycard
  */
 function getCurrentDateTimeCard() {
-  let dateTimeCard = getCachedSystemCard("Current Date and Time");
+  let dateTimeCard = storyCards.find(card => card.title === "Current Date and Time");
   if (!dateTimeCard) {
     addStoryCard("Current Date and Time");
     dateTimeCard = storyCards[storyCards.length - 1];
     dateTimeCard.type = "event";
     dateTimeCard.keys = "date,time,current date,current time,clock,hour";
     dateTimeCard.description = "Commands:\n[settime mm/dd/yyyy time] - Set starting date and time\n[advance N [hours|days|months|years]] - Advance time/date\n[sleep] - Sleep to next morning\n[reset] - Reset to most recent mention in history\n[light] - Switch to lightweight mode\n[normal] - Switch to normal mode";
-    addToSystemCardCache("Current Date and Time", dateTimeCard);
   }
   return dateTimeCard;
 }
@@ -663,14 +539,14 @@ function getCurrentDateTimeCard() {
  * @returns {Object} WTG Settings storycard
  */
 function getWTGSettingsCard() {
-  let settingsCard = getCachedSystemCard("World Time Generator Settings");
+  let settingsCard = storyCards.find(card => card.title === "World Time Generator Settings");
   if (!settingsCard) {
     addStoryCard("World Time Generator Settings");
     settingsCard = storyCards[storyCards.length - 1];
     settingsCard.type = "system";
     settingsCard.keys = ""; // No keys - not included in AI context
     settingsCard.description = "World Time Generator Settings - Edit the values below to configure the system.";
-
+    
     if (isLightweightMode()) {
       settingsCard.entry = `Time Duration Multiplier: 1.0
 Debug Mode: false
@@ -684,7 +560,6 @@ Debug Mode: false
 Enable Dynamic Time: true
 Disable WTG Entirely: false`;
     }
-    addToSystemCardCache("World Time Generator Settings", settingsCard);
   } else {
     // Update existing settings card if mode changed
     const currentlyLightweight = isLightweightMode();
@@ -866,46 +741,26 @@ function hasTimestamp(card) {
  * @param {string} text - Text to search for keywords
  * @returns {boolean} True if any keyword from the card is found in the text
  */
-/**
- * Check if any of a storycard's keywords are mentioned in the given text
- * Uses cached compiled regex patterns for performance
- * @param {Object} card - Storycard to check
- * @param {string} text - Text to search for keywords
- * @returns {boolean} True if any keyword from the card is found in the text
- */
 function isCardKeywordMentioned(card, text) {
   if (!card || !card.keys || !text) return false;
-
-  // Initialize keyword regex cache if needed
-  if (!state._keywordRegexCache || state._keywordRegexCacheTurn !== info.actionCount) {
-    state._keywordRegexCache = {};
-    state._keywordRegexCacheTurn = info.actionCount;
-  }
-
-  // Use card.keys as cache key
-  const cacheKey = card.keys;
-  let regexes = state._keywordRegexCache[cacheKey];
-
-  if (!regexes) {
-    // Build and cache regex array for this card's keywords
-    regexes = [];
-    const keys = card.keys.split(',');
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i].trim().toLowerCase();
-      if (key) {
-        regexes.push(new RegExp('\\b' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'));
-      }
-    }
-    state._keywordRegexCache[cacheKey] = regexes;
-  }
-
-  // Test each cached regex against the text
-  for (let i = 0; i < regexes.length; i++) {
-    if (regexes[i].test(text)) {
+  
+  // Normalize text to lowercase for case-insensitive matching
+  const normalizedText = text.toLowerCase();
+  
+  // Split the keys by comma and check each one
+  const keys = card.keys.split(',').map(k => k.trim().toLowerCase());
+  
+  for (const key of keys) {
+    if (!key) continue;
+    
+    // Check if the key appears as a whole word in the text
+    // Use word boundaries to avoid partial matches
+    const keyRegex = new RegExp('\\b' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    if (keyRegex.test(normalizedText)) {
       return true;
     }
   }
-
+  
   return false;
 }
 
@@ -915,19 +770,12 @@ function isCardKeywordMentioned(card, text) {
  */
 function getTurnData() {
   const dataCard = getWTGDataCard();
-  if (!dataCard || !dataCard.entry) return [];
+  if (!dataCard.entry) return [];
 
-  // Use cached turn data if available and still valid
-  const cacheKey = dataCard.entry.length;
-  if (state._turnDataCache && state._turnDataCacheKey === cacheKey && state._turnDataCacheTurn === info.actionCount) {
-    return state._turnDataCache;
-  }
-
-  let result;
   if (isLightweightMode()) {
     const turnDataRegex = /\[Turn Data\]\nAction Type: (.*?)\nAction Text: (.*?)\nTimestamp: (.*?)\n\[\/Turn Data\]/gs;
     const matches = [...dataCard.entry.matchAll(turnDataRegex)];
-    result = matches.map(match => ({
+    return matches.map(match => ({
       actionType: match[1],
       actionText: match[2],
       timestamp: match[3]
@@ -935,7 +783,7 @@ function getTurnData() {
   } else {
     const turnDataRegex = /\[Turn Data\]\nAction Type: (.*?)\nAction Text: (.*?)\nResponse Text: (.*?)\nGenerated Entities: (.*?)\nTrigger Mentions: (.*?)\nAI Command: (.*?)\nTimestamp: (.*?)\n\[\/Turn Data\]/gs;
     const matches = [...dataCard.entry.matchAll(turnDataRegex)];
-    result = matches.map(match => ({
+    return matches.map(match => ({
       actionType: match[1],
       actionText: match[2],
       responseText: match[3],
@@ -945,21 +793,6 @@ function getTurnData() {
       timestamp: match[7]
     }));
   }
-
-  // Cache the result
-  state._turnDataCache = result;
-  state._turnDataCacheKey = cacheKey;
-  state._turnDataCacheTurn = info.actionCount;
-
-  return result;
-}
-
-/**
- * Invalidate turn data cache (call after modifying turn data)
- */
-function invalidateTurnDataCache() {
-  state._turnDataCache = null;
-  state._turnDataCacheKey = null;
 }
 
 /**
@@ -1002,9 +835,6 @@ Timestamp: ${timestamp}
       dataCard.entry = modePrefix + turnDataEntry;
     }
   }
-
-  // Invalidate turn data cache since we modified it
-  invalidateTurnDataCache();
 }
 
 /**
@@ -1042,7 +872,7 @@ function parseDateTime(dateStr, timeStr) {
  */
 function cleanupWTGDataCardByTimestamp(currentTT) {
   const dataCard = getWTGDataCard();
-  if (!dataCard || !dataCard.entry) return;
+  if (!dataCard.entry) return;
 
   const modePrefix = `Mode: ${state.wtgMode || 'lightweight'}\n\n`;
 
@@ -1095,9 +925,6 @@ Timestamp: ${match[7]}
     }
     dataCard.entry = newEntry ? modePrefix + newEntry : "";
   }
-
-  // Invalidate turn data cache since we modified entries
-  invalidateTurnDataCache();
 }
 
 /**
@@ -1229,14 +1056,13 @@ function areCardTriggersMentioned(card, text) {
  * Get or create the WTG Cooldowns storycard (Normal mode only)
  */
 function getCooldownCard() {
-  let cooldownCard = getCachedSystemCard("WTG Cooldowns");
+  let cooldownCard = storyCards.find(card => card.title === "WTG Cooldowns");
   if (!cooldownCard) {
     addStoryCard("WTG Cooldowns");
     cooldownCard = storyCards[storyCards.length - 1];
     cooldownCard.type = "system";
     cooldownCard.keys = "";
     cooldownCard.description = "Internal cooldown tracking for AI commands; no keys; not included in context";
-    addToSystemCardCache("WTG Cooldowns", cooldownCard);
   }
   return cooldownCard;
 }
@@ -1246,48 +1072,18 @@ function getCooldownCard() {
  * @returns {Object} WTG Exclusions storycard
  */
 function getWTGExclusionsCard() {
-  let exclusionsCard = getCachedSystemCard("WTG Exclusions");
+  let exclusionsCard = storyCards.find(card => card.title === "WTG Exclusions");
   if (!exclusionsCard) {
     addStoryCard("WTG Exclusions");
-    exclusionsCard = storyCards[storyCards.length - 1];
-    exclusionsCard.type = "system";
-    exclusionsCard.keys = "";
-    exclusionsCard.entry = "";
-    exclusionsCard.description = "Cards excluded from WTG timestamp injection";
-    addToSystemCardCache("WTG Exclusions", exclusionsCard);
+    exclusionsCard = storyCards.find(card => card.title === "WTG Exclusions");
+    if (exclusionsCard) {
+      exclusionsCard.type = "system";
+      exclusionsCard.keys = "";
+      exclusionsCard.entry = "";
+      exclusionsCard.description = "Cards excluded from WTG timestamp injection";
+    }
   }
   return exclusionsCard;
-}
-
-/**
- * Get cached Set of excluded card titles for O(1) lookup
- * @returns {Set} Set of lowercase excluded card titles
- */
-function getExclusionSet() {
-  const card = getWTGExclusionsCard();
-  const cacheKey = card?.entry?.length || 0;
-
-  if (!state._exclusionSet || state._exclusionCacheKey !== cacheKey || state._exclusionCacheTurn !== info.actionCount) {
-    state._exclusionSet = new Set();
-    if (card?.entry) {
-      const matches = card.entry.matchAll(/\[Exclusion\]\nCard Title: (.*?)\n\[\/Exclusion\]/gs);
-      for (const m of matches) {
-        state._exclusionSet.add(m[1].toLowerCase());
-      }
-    }
-    state._exclusionCacheKey = cacheKey;
-    state._exclusionCacheTurn = info.actionCount;
-  }
-  return state._exclusionSet;
-}
-
-/**
- * Invalidate exclusion set cache (call when exclusions change)
- */
-function invalidateExclusionCache() {
-  delete state._exclusionSet;
-  delete state._exclusionCacheKey;
-  delete state._exclusionCacheTurn;
 }
 
 /**
@@ -1297,7 +1093,14 @@ function invalidateExclusionCache() {
  */
 function isCardExcluded(cardTitle) {
   if (!cardTitle) return false;
-  return getExclusionSet().has(cardTitle.toLowerCase());
+  const exclusionsCard = getWTGExclusionsCard();
+  if (!exclusionsCard || !exclusionsCard.entry) return false;
+
+  const lowerTitle = cardTitle.toLowerCase();
+  const exclusionRegex = /\[Exclusion\]\nCard Title: (.*?)\n\[\/Exclusion\]/gs;
+  const matches = [...exclusionsCard.entry.matchAll(exclusionRegex)];
+
+  return matches.some(match => match[1].toLowerCase() === lowerTitle);
 }
 
 /**
@@ -1315,9 +1118,6 @@ function addCardToExclusions(cardTitle) {
   } else {
     exclusionsCard.entry = exclusionEntry;
   }
-
-  // Invalidate exclusion cache since we added an entry
-  invalidateExclusionCache();
 }
 
 /**
