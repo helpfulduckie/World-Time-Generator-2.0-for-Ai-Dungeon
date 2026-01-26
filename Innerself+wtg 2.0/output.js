@@ -236,34 +236,37 @@ const modifier = (text) => {
         addTimestampToCard(dateTimeCard, `${state.currentDate} ${state.currentTime}`);
       }
 
+      // Combine the player's action and AI's output for keyword detection
       const combinedText = (lastAction ? lastAction.text : '') + ' ' + modifiedText;
 
-      for (let i = 0; i < storyCards.length; i++) {
+      // Limit storycard processing for performance (scenarios with 900+ cards)
+      const maxTimestampCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+      for (let i = 0; i < maxTimestampCards; i++) {
         const card = storyCards[i];
-
-        // Skip system cards and Inner-Self cards
-        if (card.title === "WTG Data" || card.title === "Current Date and Time" ||
-            card.title === "World Time Generator Settings" || card.title === "WTG Cooldowns" ||
-            card.title === "WTG Exclusions" || card.title === "Configure Inner Self" ||
-            card.title === "Configure Auto-Cards" || card.title === "Debug Data" ||
-            (card.title && card.title.toLowerCase().includes("brain"))) {
+        if (!card) continue;
+        // Skip system cards (O(1) Set lookup)
+        if (SYSTEM_CARD_TITLES.has(card.title)) {
           continue;
         }
-
+        // Skip Inner-Self brain cards
+        if (card.title && card.title.toLowerCase().includes("brain")) {
+          continue;
+        }
+        // Process [e] marker - removes marker and adds card to exclusions list
         if (processExclusionMarker(card)) {
           continue;
         }
-
+        // Add timestamp only if card doesn't have one AND its keywords are mentioned in the text
         if (card.entry && !hasTimestamp(card) && isCardKeywordMentioned(card, combinedText)) {
           addTimestampToCard(card, `${state.currentDate} ${state.currentTime}`);
         }
       }
     }
 
-    // Add turn data to WTG Data storycard
+    // Add turn data to WTG Data storycard if we found a player action and it's not a continue
     if (lastAction && actionType !== "continue") {
       const timestamp = formatTurnTime(state.turnTime);
-      addTurnData(actionType, lastAction.text, modifiedText, timestamp);
+      addTurnData(actionType, lastAction.text, timestamp);
     }
 
     // Update the Current Date and Time storycard

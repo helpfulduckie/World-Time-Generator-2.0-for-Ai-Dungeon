@@ -1300,6 +1300,15 @@ function isCardExcluded(cardTitle) {
 }
 
 /**
+ * Invalidate exclusion set cache (call when exclusions change)
+ */
+function invalidateExclusionCache() {
+  delete state._exclusionSet;
+  delete state._exclusionCacheKey;
+  delete state._exclusionCacheTurn;
+}
+
+/**
  * Add a storycard to the exclusions list
  * @param {string} cardTitle - Title of the card to exclude
  */
@@ -1314,6 +1323,9 @@ function addCardToExclusions(cardTitle) {
   } else {
     exclusionsCard.entry = exclusionEntry;
   }
+
+  // Invalidate exclusion cache since we added an entry
+  invalidateExclusionCache();
 }
 
 /**
