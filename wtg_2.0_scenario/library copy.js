@@ -1,3 +1,7 @@
+// ========== WTG 2.0 SCENARIO - LIBRARY SCRIPT ==========
+// Paste this ONLY into the LIBRARY tab in AI Dungeon scripting
+// ==========================================================
+
 // library.js - Core time management functions for WTG with mode switching (Normal/Lightweight)
 // This library supports both Normal mode (full features) and Lightweight mode (minimal features)
 
@@ -20,6 +24,50 @@ const descriptiveMap = new Map([
  */
 function isLightweightMode() {
   return state.wtgMode === 'lightweight';
+}
+
+/**
+ * Get the WTG Time Config storycard if it exists
+ * Simple direct scan - no caching to avoid state serialization issues
+ * @returns {Object|null} The WTG Time Config card or null
+ */
+function getWTGTimeConfigCard() {
+  for (let i = 0; i < storyCards.length; i++) {
+    const card = storyCards[i];
+    if (card && card.title === "WTG Time Config") {
+      return card;
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse the WTG Time Config card for starting date/time
+ * Card format:
+ *   Starting Date: MM/DD/YYYY
+ *   Starting Time: HH:MM AM/PM
+ *   Initialized: true/false
+ * @returns {Object|null} Object with startingDate, startingTime, initialized or null
+ */
+function parseWTGTimeConfig() {
+  const configCard = getWTGTimeConfigCard();
+  if (!configCard) return null;
+
+  // AI Dungeon JSON exports use 'value', runtime uses 'entry'
+  const content = configCard.entry || configCard.value;
+  if (!content) return null;
+
+  const dateMatch = content.match(/Starting Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+  const timeMatch = content.match(/Starting Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+  const initMatch = content.match(/Initialized:\s*(true|false)/i);
+
+  if (!dateMatch || !timeMatch) return null;
+
+  return {
+    startingDate: dateMatch[1],
+    startingTime: timeMatch[1],
+    initialized: initMatch ? initMatch[1].toLowerCase() === 'true' : false
+  };
 }
 
 /**
@@ -854,11 +902,18 @@ function compareTurnTime(tt1, tt2) {
  * Parse a date/time string into a Date object
  * @param {string} dateStr - Date string in mm/dd/yyyy format
  * @param {string} timeStr - Time string in hh:mm AM/PM format
- * @returns {Date} Date object
+ * @returns {Date|null} Date object or null if inputs are invalid
  */
 function parseDateTime(dateStr, timeStr) {
+  if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('/')) {
+    return null;
+  }
+  if (!timeStr || typeof timeStr !== 'string') {
+    return null;
+  }
   const [month, day, year] = dateStr.split('/').map(Number);
   const time = parseTime(timeStr);
+  if (!time) return null;
   return new Date(year, month - 1, day, time.hour, time.min, time.sec);
 }
 
@@ -929,7 +984,13 @@ Timestamp: ${match[7]}
  * @param {string} currentTime - Current time string in hh:mm AM/PM format
  */
 function cleanupStoryCardsByTimestamp(currentDate, currentTime) {
+  // Early return if current date/time is not set
+  if (!currentDate || !currentTime || currentDate === '01/01/1900' || currentTime === 'Unknown') {
+    return;
+  }
   const currentDateTime = parseDateTime(currentDate, currentTime);
+  if (!currentDateTime) return;
+
   for (let i = storyCards.length - 1; i >= 0; i--) {
     const card = storyCards[i];
     if (card.title === "WTG Data" || card.title === "Current Date and Time" || !card.entry) {
@@ -940,7 +1001,7 @@ function cleanupStoryCardsByTimestamp(currentDate, currentTime) {
       const cardDate = discoveredMatch[1];
       const cardTime = discoveredMatch[2];
       const cardDateTime = parseDateTime(cardDate, cardTime);
-      if (cardDateTime > currentDateTime) {
+      if (cardDateTime && cardDateTime > currentDateTime) {
         card.entry = card.entry.replace(/\n\n(?:Discovered on|Met on|Visited) .+/, '');
       }
     }

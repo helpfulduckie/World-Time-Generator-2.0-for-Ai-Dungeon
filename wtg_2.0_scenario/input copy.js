@@ -1,3 +1,7 @@
+// ========== WTG 2.0 SCENARIO - INPUT SCRIPT ==========
+// Paste this ONLY into the INPUT tab in AI Dungeon scripting
+// ======================================================
+
 // input.js - Handle user commands and process player actions for WTG with mode switching
 
 const modifier = (text) => {
@@ -38,6 +42,22 @@ const modifier = (text) => {
     state.advanceEndTime = state.advanceEndTime || null;
   }
 
+  // Check for WTG Time Config card (runs before commands so [advance]/[sleep] work correctly)
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
+    const timeConfig = parseWTGTimeConfig();
+    if (timeConfig && timeConfig.initialized) {
+      state.startingDate = timeConfig.startingDate;
+      state.startingTime = timeConfig.startingTime;
+      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      state.currentDate = currentDate;
+      state.currentTime = currentTime;
+      // Mark settime as initialized (persists marker to WTG Data card)
+      markSettimeAsInitialized();
+      state.changed = true;
+    }
+  }
+
   let modifiedText = text;
   let messages = [];
 
@@ -67,6 +87,8 @@ const modifier = (text) => {
     }
     state.insertMarker = true;
     state.changed = true;
+    // Flag to prevent context.js from overwriting turnTime (new input isn't in history yet)
+    state.turnTimeModifiedByCommand = true;
     // Set sleep cooldown to prevent AI from sleeping again for 8 hours (Normal mode only)
     if (!isLightweightMode()) {
       setSleepCooldown({hours: 8});
@@ -160,6 +182,8 @@ const modifier = (text) => {
           messages.push(`[SYSTEM] Advanced ${amount} ${unit}${extraMinutes ? ` and ${extraMinutes} minutes` : ''}. New date/time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
           state.insertMarker = true;
           state.changed = true;
+          // Flag to prevent context.js from overwriting turnTime (new input isn't in history yet)
+          state.turnTimeModifiedByCommand = true;
           // Set advance cooldown to prevent AI from advancing again for 5 minutes (Normal mode only)
           if (!isLightweightMode()) {
             setAdvanceCooldown({minutes: 5});

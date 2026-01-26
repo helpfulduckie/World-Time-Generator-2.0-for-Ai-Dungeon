@@ -269,7 +269,10 @@ const modifier = (text) => {
     // Add turn data to WTG Data storycard if we found a player action and it's not a continue
     if (lastAction && actionType !== "continue") {
       const timestamp = formatTurnTime(state.turnTime);
-      addTurnData(actionType, lastAction.text, timestamp);
+      // Extract first two sentences for responseText
+      const firstTwoSentences = narrative.match(/^[^.!?]*[.!?][^.!?]*[.!?]/) || [narrative.substring(0, 200)];
+      const responseText = firstTwoSentences[0].trim();
+      addTurnData(actionType, lastAction.text, responseText, timestamp);
     }
 
     // Update the Current Date and Time storycard

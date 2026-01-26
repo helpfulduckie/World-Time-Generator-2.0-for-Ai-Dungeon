@@ -48,7 +48,11 @@ const modifier = (text) => {
       // Use config card values directly - skip full storycard scan
       state.startingDate = timeConfig.startingDate;
       state.startingTime = timeConfig.startingTime;
-      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      // Don't reset turnTime if it was already set by a command in input.js
+      // This fixes [advance]/[sleep] being overwritten when using WTG Time Config card
+      if (!state.turnTimeModifiedByCommand) {
+        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      }
       const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
       state.currentDate = currentDate;
       state.currentTime = currentTime;
@@ -92,7 +96,10 @@ const modifier = (text) => {
               } else {
                 state.startingTime = 'Unknown';
               }
-              state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+              // Don't reset turnTime if it was already set by a command in input.js
+              if (!state.turnTimeModifiedByCommand) {
+                state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+              }
               const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
               state.currentDate = currentDate;
               state.currentTime = currentTime;
@@ -324,6 +331,8 @@ const modifier = (text) => {
   }
 
   delete state.insertMarker;
+  // Clean up the command flag (set by input.js, used by context.js and output.js)
+  delete state.turnTimeModifiedByCommand;
 
   // Ensure the modified text starts with a space
   modifiedText = ensureLeadingSpace(modifiedText);

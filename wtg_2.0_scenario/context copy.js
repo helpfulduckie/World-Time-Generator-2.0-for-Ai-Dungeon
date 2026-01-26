@@ -1,3 +1,7 @@
+// ========== WTG 2.0 SCENARIO - CONTEXT SCRIPT ==========
+// Paste this ONLY into the CONTEXT tab in AI Dungeon scripting
+// ========================================================
+
 // context.js - Handle context modifications and time adjustments for WTG with mode switching
 
 const modifier = (text) => {
@@ -40,6 +44,11 @@ const modifier = (text) => {
       }
     }
 
+    // Check if a command just modified turnTime - if so, skip recalculation
+    // The modified input isn't in history yet, so we'd incorrectly overwrite the command's value
+    const skipTimeRecalc = state.turnTimeModifiedByCommand;
+    // Don't delete flag here - output.js also needs to check it
+
     // Get character count from history for time adjustment
     const {lastTT, charsAfter, found} = getLastTurnTimeAndChars(history);
 
@@ -54,7 +63,10 @@ const modifier = (text) => {
 
     let additionalMinutes = 0;
 
-    if (useLastTTDirectly) {
+    if (skipTimeRecalc) {
+      // Command just set turnTime - don't overwrite it
+      // state.turnTime, currentDate, currentTime are already correct from input.js
+    } else if (useLastTTDirectly) {
       // User command provided exact timestamp - use it without modification
       state.turnTime = lastTT;
       const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
@@ -177,6 +189,11 @@ const modifier = (text) => {
   const similarity1 = calculateKeywordSimilarity(lastKeywords, currentKeywords);
   const similarity2 = calculateKeywordSimilarity(secondLastKeywords, currentKeywords);
   
+  // Check if a command just modified turnTime - if so, skip recalculation
+  // The modified input isn't in history yet, so we'd incorrectly overwrite the command's value
+  const skipTimeRecalc = state.turnTimeModifiedByCommand;
+  // Don't delete flag here - output.js also needs to check it
+
   // Get character count from history for time adjustment
   const {lastTT, charsAfter, found: markerFound} = getLastTurnTimeAndChars(history);
 
@@ -191,7 +208,10 @@ const modifier = (text) => {
 
   let additionalMinutes = 0;
 
-  if (useLastTTDirectly) {
+  if (skipTimeRecalc) {
+    // Command just set turnTime - don't overwrite it
+    // state.turnTime, currentDate, currentTime are already correct from input.js
+  } else if (useLastTTDirectly) {
     // User command provided exact timestamp - use it without modification
     state.turnTime = lastTT;
     const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
