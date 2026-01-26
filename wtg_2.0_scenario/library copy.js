@@ -1269,7 +1269,7 @@ function getExclusionSet() {
   const card = getWTGExclusionsCard();
   const cacheKey = card?.entry?.length || 0;
 
-  if (!state._exclusionSet || state._exclusionCacheKey !== cacheKey || state._exclusionCacheTurn !== info.actionCount) {
+  if (!(state._exclusionSet instanceof Set) || state._exclusionCacheKey !== cacheKey || state._exclusionCacheTurn !== info.actionCount) {
     state._exclusionSet = new Set();
     if (card?.entry) {
       const matches = card.entry.matchAll(/\[Exclusion\]\nCard Title: (.*?)\n\[\/Exclusion\]/gs);

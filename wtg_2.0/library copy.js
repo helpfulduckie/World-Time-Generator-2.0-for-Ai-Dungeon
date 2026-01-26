@@ -1834,7 +1834,7 @@ function getExclusionSet() {
   const exclusionsCard = getWTGExclusionsCard();
   const cacheKey = exclusionsCard?.entry?.length || 0;
 
-  if (!state._exclusionSet || state._exclusionCacheKey !== cacheKey || state._exclusionCacheTurn !== info.actionCount) {
+  if (!(state._exclusionSet instanceof Set) || state._exclusionCacheKey !== cacheKey || state._exclusionCacheTurn !== info.actionCount) {
     state._exclusionSet = new Set();
     if (exclusionsCard?.entry) {
       const exclusionRegex = /\[Exclusion\]\nCard Title: (.*?)\n\[\/Exclusion\]/gs;
