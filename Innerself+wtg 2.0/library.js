@@ -2864,6 +2864,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities
   - ${ownership(agent.name)} thought must be one single sentence only
   - Never hallucinate facts
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick inside the parentheses; close with ".\`)"
 
 This creates or overwrites the thought associated with that key.
@@ -2900,6 +2901,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities
   - ${ownership(agent.name)} thought must be one single sentence only
   - Never hallucinate facts
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick inside the parentheses; close with ".\`)"
 
 This creates or overwrites the thought associated with that key.
@@ -2936,6 +2938,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities
   - ${ownership(agent.name)} thought must be one single sentence only
   - Never hallucinate facts
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick inside the parentheses; close with ".\`)"
 
 This creates or overwrites the thought associated with that key.
@@ -2992,6 +2995,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities.
   - ${ownership(agent.name)} thought must be short.
   - Never hallucinate facts.
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick **inside** the parentheses; close with ".\`)".
 
 This creates or overwrites the thought associated with that key.
@@ -3101,6 +3105,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities.
   - ${ownership(agent.name)} thought must be short.
   - Never hallucinate facts.
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick **inside** the parentheses; close with ".\`)".
 
 This creates or overwrites the thought associated with that key.
@@ -3210,6 +3215,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities.
   - ${ownership(agent.name)} thought must be short.
   - Never hallucinate facts.
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick **inside** the parentheses; close with ".\`)".
 
 This creates or overwrites the thought associated with that key.
