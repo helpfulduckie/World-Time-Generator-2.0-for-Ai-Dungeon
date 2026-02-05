@@ -308,7 +308,15 @@ const modifier = (text) => {
   }
 
   // ========== INNER-SELF OUTPUT PROCESSING ==========
+  // InnerSelf operates on the global 'text' variable directly.
+  // Sync global text with WTG's processed version so InnerSelf sees clean text,
+  // then adopt InnerSelf's result (which has brain blocks removed and encoding added).
+  globalThis.text = modifiedText;
   InnerSelf("output");
+  modifiedText = globalThis.text;
+
+  // Clean up turnTimeModifiedByCommand flag (set in input.js, read in context.js)
+  delete state.turnTimeModifiedByCommand;
 
   // Ensure the modified text starts with a space
   return { text: ensureLeadingSpace(modifiedText) };

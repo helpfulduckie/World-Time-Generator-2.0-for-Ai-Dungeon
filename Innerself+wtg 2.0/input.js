@@ -24,9 +24,10 @@ const modifier = (text) => {
       state.settimeInitialized = false;
     }
 
-    // Check for WTG Time Config card to initialize state before processing commands
-    // This must happen in input.js because commands like [advance] run before output.js
-    if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
+    const tryInitializeFromTimeConfig = () => {
+      if (state.settimeInitialized) {
+        return false;
+      }
       const timeConfig = parseWTGTimeConfig();
       if (timeConfig && timeConfig.initialized) {
         state.startingDate = timeConfig.startingDate;
@@ -43,15 +44,32 @@ const modifier = (text) => {
         getCooldownCard();
         getWTGCommandsCard();
         state.changed = true;
+        return true;
       }
+      return false;
+    };
+
+    // Check for WTG Time Config card to initialize state before processing commands
+    // This must happen in input.js because commands like [advance] run before output.js
+    if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
+      tryInitializeFromTimeConfig();
     }
+
+    const bracketCommandRegex = /\[(\s*(?:settime|advance|sleep|reset)\b[^\]]*)\]/gi;
+    const commandQueue = [];
+    let commandMatch;
+    while ((commandMatch = bracketCommandRegex.exec(modifiedText)) !== null) {
+      commandQueue.push(commandMatch[1].trim());
+    }
+    bracketCommandRegex.lastIndex = 0;
+    const hasWTGCommand = commandQueue.length > 0;
 
     // Auto-initialize with IRL time if user takes action without [settime]
     // Only trigger after initial message has been shown (prevents triggering on opening prompt)
     if (state.startingDate === '01/01/1900' && !state.settimeInitialized && state.initialMessageShown) {
       // Check if this is NOT a command (doesn't start with [something])
       const trimmedText = text.trim();
-      if (!trimmedText.match(/^\[.+?\]/)) {
+      if (!hasWTGCommand && !trimmedText.match(/^\[.+?\]/)) {
         // User is doing a regular action without having set time - auto-set IRL date with default time
         const now = new Date();
         const month = now.getMonth() + 1;
@@ -77,45 +95,43 @@ const modifier = (text) => {
 
     let wtgMessages = [];
 
-    // Check if user action is [sleep] command
-    if (modifiedText.trim().toLowerCase() === '[sleep]') {
-      if (state.currentTime !== 'Unknown' && /\d/.test(state.currentTime)) {
-        let sleepHours = Math.floor(Math.random() * 3) + 6;
-        let sleepMinutes = Math.floor(Math.random() * 60);
-        let add = {hours: sleepHours, minutes: sleepMinutes};
-        state.turnTime = addToTurnTime(state.turnTime, add);
-        const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
-        state.currentDate = currentDate;
-        state.currentTime = currentTime;
-        let wakeMessage = (add.days > 0 || state.turnTime.days > 0) ? "the next day" : "later that day";
-        const ttMarker = formatTurnTime(state.turnTime);
-        wtgMessages.push(`[SYSTEM] You go to sleep and wake up ${wakeMessage} on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
-      } else {
-        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-        state.turnTime = addToTurnTime(state.turnTime, {days: 1});
-        state.startingTime = "8:00 AM";
-        const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
-        state.currentDate = currentDate;
-        state.currentTime = currentTime;
-        const ttMarker = formatTurnTime(state.turnTime);
-        wtgMessages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
-      }
-      state.insertMarker = true;
-      state.changed = true;
-      // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
-      state.turnTimeModifiedByCommand = true;
-      setSleepCooldown({hours: 8});
-      modifiedText = '';
-    }
-    // Handle bracketed commands
-    else {
-      let trimmedText = modifiedText.trim();
-      if (trimmedText.match(/^\[(.+?)\]$/)) {
-        const commandStr = trimmedText.match(/^\[(.+?)\]$/)[1].trim().toLowerCase();
-        const parts = commandStr.split(/\s+/);
-        const command = parts[0];
+    if (commandQueue.length > 0) {
+      modifiedText = modifiedText.replace(bracketCommandRegex, " ").replace(/\s{2,}/g, " ").trim();
+      for (const commandEntry of commandQueue) {
+        if (!commandEntry) {
+          continue;
+        }
+        const parts = commandEntry.split(/\s+/);
+        const command = parts[0].toLowerCase();
 
-        if (command === 'settime') {
+        if (command === 'sleep') {
+          if (state.currentTime !== 'Unknown' && /\d/.test(state.currentTime)) {
+            let sleepHours = Math.floor(Math.random() * 3) + 6;
+            let sleepMinutes = Math.floor(Math.random() * 60);
+            let add = {hours: sleepHours, minutes: sleepMinutes};
+            state.turnTime = addToTurnTime(state.turnTime, add);
+            const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+            state.currentDate = currentDate;
+            state.currentTime = currentTime;
+            let wakeMessage = (add.days > 0 || state.turnTime.days > 0) ? "the next day" : "later that day";
+            const ttMarker = formatTurnTime(state.turnTime);
+            wtgMessages.push(`[SYSTEM] You go to sleep and wake up ${wakeMessage} on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
+          } else {
+            state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+            state.turnTime = addToTurnTime(state.turnTime, {days: 1});
+            state.startingTime = "8:00 AM";
+            const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+            state.currentDate = currentDate;
+            state.currentTime = currentTime;
+            const ttMarker = formatTurnTime(state.turnTime);
+            wtgMessages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
+          }
+          state.insertMarker = true;
+          state.changed = true;
+          // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
+          state.turnTimeModifiedByCommand = true;
+          setSleepCooldown({hours: 8});
+        } else if (command === 'settime') {
           let dateStr = parts[1];
           let timeStr = parts.slice(2).join(' ');
           if (dateStr) {
@@ -155,32 +171,39 @@ const modifier = (text) => {
             }
           }
         } else if (command === 'advance') {
+          if (state.startingTime === 'Unknown' && !state.settimeInitialized) {
+            tryInitializeFromTimeConfig();
+          }
           if (state.startingTime === 'Unknown') {
             wtgMessages.push(`[Time advancement not applied as current time is descriptive (${state.startingTime}). Use [settime] to set a numeric time if needed.]`);
           } else {
             const amount = parseInt(parts[1], 10);
-            const unit = parts[2] ? parts[2].toLowerCase() : 'hours';
-            let add = {};
-            if (unit.startsWith('y')) {
-              add.years = amount;
-            } else if (unit.startsWith('m')) {
-              add.months = amount;
-            } else if (unit.startsWith('d')) {
-              add.days = amount;
+            if (isNaN(amount) || amount <= 0) {
+              wtgMessages.push('[Invalid advance command. Use: [advance N hours/days/months/years]. Example: [advance 2 hours]]');
             } else {
-              add.hours = amount;
+              const unit = parts[2] ? parts[2].toLowerCase() : 'hours';
+              let add = {};
+              if (unit.startsWith('y')) {
+                add.years = amount;
+              } else if (unit.startsWith('m')) {
+                add.months = amount;
+              } else if (unit.startsWith('d')) {
+                add.days = amount;
+              } else {
+                add.hours = amount;
+              }
+              state.turnTime = addToTurnTime(state.turnTime, add);
+              const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+              state.currentDate = currentDate;
+              state.currentTime = currentTime;
+              const ttMarker = formatTurnTime(state.turnTime);
+              wtgMessages.push(`[SYSTEM] Advanced ${amount} ${unit}. New date/time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+              state.insertMarker = true;
+              state.changed = true;
+              // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
+              state.turnTimeModifiedByCommand = true;
+              setAdvanceCooldown({minutes: 5});
             }
-            state.turnTime = addToTurnTime(state.turnTime, add);
-            const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
-            state.currentDate = currentDate;
-            state.currentTime = currentTime;
-            const ttMarker = formatTurnTime(state.turnTime);
-            wtgMessages.push(`[SYSTEM] Advanced ${amount} ${unit}. New date/time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
-            state.insertMarker = true;
-            state.changed = true;
-            // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
-            state.turnTimeModifiedByCommand = true;
-            setAdvanceCooldown({minutes: 5});
           }
         } else if (command === 'reset') {
           let newDate = getCurrentDateFromHistory('', true);
@@ -211,10 +234,6 @@ const modifier = (text) => {
           } else {
             wtgMessages.push(`[No date or time mentions found in history.]`);
           }
-        }
-        // Clear the command text if it was a WTG command
-        if (['settime', 'advance', 'reset'].includes(command)) {
-          modifiedText = '';
         }
       }
     }

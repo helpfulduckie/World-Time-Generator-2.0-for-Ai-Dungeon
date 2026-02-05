@@ -59,8 +59,8 @@ const modifier = (text) => {
 
     // Check if a command (advance/sleep) just modified turnTime - if so, skip recalculation
     // The modified input isn't in history yet, so we'd incorrectly overwrite the command's value
+    // Note: Don't delete the flag here - output.js also needs it and will clean it up
     const skipTimeRecalc = state.turnTimeModifiedByCommand;
-    delete state.turnTimeModifiedByCommand;
 
     // Get character count from history for time adjustment
     const {lastTT, charsAfter, found: markerFound} = getLastTurnTimeAndChars(history);

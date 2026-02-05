@@ -7210,6 +7210,20 @@ function AutoCards(inHook, inText, inStop) {
                     AC.generation.completed + generationsRemaining
                 ));
                 if (generationsRemaining <= 0) {
+                    const workpieceEntry = (AC.generation.workpiece.entry || "").trim();
+                    const titleHeader = "{title: " + AC.generation.workpiece.title + "}";
+                    const entryWithoutTitle = workpieceEntry.startsWith(titleHeader)
+                        ? workpieceEntry.slice(titleHeader.length).trim()
+                        : workpieceEntry;
+                    if (entryWithoutTitle === "") {
+                        notify("Auto-Cards discarded an empty entry for \"" + AC.generation.workpiece.title + "\".");
+                        AC.generation.cooldown = AC.config.addCardCooldown;
+                        AC.generation.completed = 0;
+                        AC.generation.permitted = 34;
+                        AC.generation.workpiece = O.f({});
+                        clearTransientTitles();
+                        return;
+                    }
                     notify("\"" + AC.generation.workpiece.title + "\" was successfully added to your story cards!");
                     constructCard(O.f({
                         type: AC.generation.workpiece.type,
