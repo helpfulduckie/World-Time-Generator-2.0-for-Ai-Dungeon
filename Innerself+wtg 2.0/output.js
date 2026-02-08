@@ -60,6 +60,7 @@ const modifier = (text) => {
       updateDateTimeCard();
       getWTGSettingsCard();
       getCooldownCard();
+      getWTGCommandsCard();
       if (!isLightweightMode()) {
         getWTGDataCard();
       }
@@ -98,6 +99,7 @@ const modifier = (text) => {
               updateDateTimeCard();
               getWTGSettingsCard();
               getCooldownCard();
+              getWTGCommandsCard();
               if (!isLightweightMode()) {
                 getWTGDataCard();
               }
@@ -111,9 +113,32 @@ const modifier = (text) => {
     }
   }
 
+  // Fallback auto-IRL-time for "continue" actions (onInput may not run for these)
+  if (state.initialMessageShown && !state.settimeInitialized &&
+      state.startingDate === '01/01/1900' && info.actionCount > 1) {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    const year = now.getFullYear();
+
+    state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+    state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
+    state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+    const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+    state.currentDate = currentDate;
+    state.currentTime = currentTime;
+    markSettimeAsInitialized();
+    updateDateTimeCard();
+    getWTGSettingsCard();
+    getCooldownCard();
+    getWTGCommandsCard();
+    state.changed = true;
+  }
+
   // If settime has NOT been initialized and we're at the start, show setup prompt
   if (!hasSettimeBeenInitialized() && state.startingDate === '01/01/1900' && state.startingTime === 'Unknown') {
-    return { text: ' Please switch to story mode and use the command, [settime mm/dd/yyyy time] to set a custom starting date and time. (eg: [settime 01/01/1900 12:00 am])\n\nLightweight mode is recommended for free users and llama models.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)' };
+    state.initialMessageShown = true;
+    return { text: ' Use [settime mm/dd/yyyy time] to set a custom starting date and time, or just take any action to auto-initialize with the current real-world time.\n\nThis version combines WTG time tracking with Inner Self for NPC memory and behavior.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)' };
   }
 
   // Normal processing
@@ -234,10 +259,8 @@ const modifier = (text) => {
 
     // Add timestamps to existing storycards
     if (hasSettimeBeenInitialized()) {
-      const dateTimeCard = storyCards.find(card => card.title === "Current Date and Time");
-      if (dateTimeCard) {
-        addTimestampToCard(dateTimeCard, `${state.currentDate} ${state.currentTime}`);
-      }
+      // Note: Current Date and Time card is updated via updateDateTimeCard(), not here
+      // (It's a system card that displays time directly, not a discovery card)
 
       // Combine the player's action and AI's output for keyword detection
       const combinedText = (lastAction ? lastAction.text : '') + ' ' + modifiedText;
@@ -285,7 +308,15 @@ const modifier = (text) => {
   }
 
   // ========== INNER-SELF OUTPUT PROCESSING ==========
+  // InnerSelf operates on the global 'text' variable directly.
+  // Sync global text with WTG's processed version so InnerSelf sees clean text,
+  // then adopt InnerSelf's result (which has brain blocks removed and encoding added).
+  globalThis.text = modifiedText;
   InnerSelf("output");
+  modifiedText = globalThis.text;
+
+  // Clean up turnTimeModifiedByCommand flag (set in input.js, read in context.js)
+  delete state.turnTimeModifiedByCommand;
 
   // Ensure the modified text starts with a space
   return { text: ensureLeadingSpace(modifiedText) };

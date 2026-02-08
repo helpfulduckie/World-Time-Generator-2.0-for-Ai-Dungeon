@@ -40,6 +40,35 @@ const modifier = (text) => {
       state.currentTime = currentTime;
       // Mark settime as initialized (persists marker to WTG Data card)
       markSettimeAsInitialized();
+      // Initialize storycards
+      updateDateTimeCard();
+      getWTGSettingsCard();
+      getWTGCommandsCard();
+      state.changed = true;
+    }
+  }
+
+  // Auto-initialize with IRL time if user takes action without [settime]
+  // Only trigger after initial message has been shown (prevents triggering on opening prompt)
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized && state.initialMessageShown) {
+    // Check if this is NOT a command (doesn't start with [something])
+    const trimmedText = text.trim();
+    if (!trimmedText.match(/^\[.+?\]/)) {
+      // User is doing a regular action without having set time - auto-set IRL date with default time
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const day = now.getDate();
+      const year = now.getFullYear();
+      state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+      state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
+      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      state.currentDate = currentDate;
+      state.currentTime = currentTime;
+      markSettimeAsInitialized();
+      updateDateTimeCard();
+      getWTGSettingsCard();
+      getWTGCommandsCard();
       state.changed = true;
     }
   }
@@ -121,6 +150,10 @@ const modifier = (text) => {
             messages.push(`[SYSTEM] Starting date and time set to ${state.startingDate} ${state.startingTime}. [[${ttMarker}]]. `);
             // Mark settime as initialized and create WTG Settings card
             markSettimeAsInitialized();
+            // Initialize storycards
+            updateDateTimeCard();
+            getWTGSettingsCard();
+            getWTGCommandsCard();
             state.insertMarker = true;
             state.changed = true;
           } else {

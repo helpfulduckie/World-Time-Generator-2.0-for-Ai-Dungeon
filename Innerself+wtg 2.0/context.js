@@ -59,8 +59,8 @@ const modifier = (text) => {
 
     // Check if a command (advance/sleep) just modified turnTime - if so, skip recalculation
     // The modified input isn't in history yet, so we'd incorrectly overwrite the command's value
+    // Note: Don't delete the flag here - output.js also needs it and will clean it up
     const skipTimeRecalc = state.turnTimeModifiedByCommand;
-    delete state.turnTimeModifiedByCommand;
 
     // Get character count from history for time adjustment
     const {lastTT, charsAfter, found: markerFound} = getLastTurnTimeAndChars(history);
@@ -100,9 +100,9 @@ const modifier = (text) => {
       if (additionalMinutes > 0) {
         state.turnTime = addToTurnTime(lastTT, {minutes: additionalMinutes});
         state.changed = true;
-      } else {
-        state.turnTime = lastTT;
       }
+      // If additionalMinutes is 0, preserve existing state.turnTime
+      // Don't overwrite with potentially stale lastTT from WTG Data
       const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
       state.currentDate = currentDate;
       state.currentTime = currentTime;
@@ -159,9 +159,16 @@ ${sleepInstruction} ${advanceInstruction}
   }
 
   // ========== INNER-SELF CONTEXT PROCESSING ==========
+  // InnerSelf modifies the global 'text' variable directly
+  // We need to set global text to our modified text, let InnerSelf process it,
+  // then return the modified global text
+  text = modifiedText;
   InnerSelf("context");
+  // InnerSelf may have modified global 'text' with brain content
+  // Use the global text if it was modified, otherwise keep our modifiedText
+  const finalText = (text && text !== modifiedText) ? text : modifiedText;
 
-  return { text: modifiedText, stop };
+  return { text: finalText, stop };
 };
 
 modifier(text);

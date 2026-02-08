@@ -1150,6 +1150,38 @@ Disable WTG Entirely: false`;
 }
 
 /**
+ * Get or create WTG Commands Guide storycard (visible to players)
+ * @returns {Object} WTG Commands Guide storycard
+ */
+function getWTGCommandsCard() {
+  let card = storyCards.find(c => c.title === "WTG Commands Guide");
+  if (!card) {
+    addStoryCard("WTG Commands Guide");
+    card = storyCards.find(c => c.title === "WTG Commands Guide");
+    if (card) {
+      card.type = "system";
+      card.description = "WTG command reference";
+      card.keys = "";
+      card.entry = `Available WTG Commands:
+
+[settime mm/dd/yyyy time] - Set starting date and time
+  Example: [settime 01/01/2025 12:00 pm]
+
+[advance X units] - Advance time forward
+  Example: [advance 1 hour], [advance 30 minutes], [advance 2 days]
+
+[sleep X units] - Sleep/rest for duration
+  Example: [sleep 8 hours]
+
+[reset] - Reset time to starting values
+
+Note: This version combines WTG time tracking with Inner Self for NPC memory and behavior.`;
+    }
+  }
+  return card;
+}
+
+/**
  * Get or create the WTG Cooldowns storycard
  * @returns {Object} WTG Cooldowns storycard
  */
@@ -2832,6 +2864,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities
   - ${ownership(agent.name)} thought must be one single sentence only
   - Never hallucinate facts
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick inside the parentheses; close with ".\`)"
 
 This creates or overwrites the thought associated with that key.
@@ -2868,6 +2901,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities
   - ${ownership(agent.name)} thought must be one single sentence only
   - Never hallucinate facts
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick inside the parentheses; close with ".\`)"
 
 This creates or overwrites the thought associated with that key.
@@ -2904,6 +2938,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities
   - ${ownership(agent.name)} thought must be one single sentence only
   - Never hallucinate facts
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick inside the parentheses; close with ".\`)"
 
 This creates or overwrites the thought associated with that key.
@@ -2960,6 +2995,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities.
   - ${ownership(agent.name)} thought must be short.
   - Never hallucinate facts.
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick **inside** the parentheses; close with ".\`)".
 
 This creates or overwrites the thought associated with that key.
@@ -3069,6 +3105,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities.
   - ${ownership(agent.name)} thought must be short.
   - Never hallucinate facts.
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick **inside** the parentheses; close with ".\`)".
 
 This creates or overwrites the thought associated with that key.
@@ -3178,6 +3215,7 @@ Inside the parentheses:
   - Never repeat, novelty and uniqueness are top priorities.
   - ${ownership(agent.name)} thought must be short.
   - Never hallucinate facts.
+  - Never store timestamps, current time, or date information as thoughts. Focus on meaningful memories, plans, and observations.
 - End the sentence with a period and backtick **inside** the parentheses; close with ".\`)".
 
 This creates or overwrites the thought associated with that key.
@@ -7172,6 +7210,20 @@ function AutoCards(inHook, inText, inStop) {
                     AC.generation.completed + generationsRemaining
                 ));
                 if (generationsRemaining <= 0) {
+                    const workpieceEntry = (AC.generation.workpiece.entry || "").trim();
+                    const titleHeader = "{title: " + AC.generation.workpiece.title + "}";
+                    const entryWithoutTitle = workpieceEntry.startsWith(titleHeader)
+                        ? workpieceEntry.slice(titleHeader.length).trim()
+                        : workpieceEntry;
+                    if (entryWithoutTitle === "") {
+                        notify("Auto-Cards discarded an empty entry for \"" + AC.generation.workpiece.title + "\".");
+                        AC.generation.cooldown = AC.config.addCardCooldown;
+                        AC.generation.completed = 0;
+                        AC.generation.permitted = 34;
+                        AC.generation.workpiece = O.f({});
+                        clearTransientTitles();
+                        return;
+                    }
                     notify("\"" + AC.generation.workpiece.title + "\" was successfully added to your story cards!");
                     constructCard(O.f({
                         type: AC.generation.workpiece.type,

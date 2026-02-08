@@ -632,6 +632,44 @@ Disable WTG Entirely: false`;
 }
 
 /**
+ * Get or create WTG Commands Guide storycard (visible to players)
+ * @returns {Object} WTG Commands Guide storycard
+ */
+function getWTGCommandsCard() {
+  let card = storyCards.find(c => c.title === "WTG Commands Guide");
+  if (!card) {
+    addStoryCard("WTG Commands Guide");
+    card = storyCards.find(c => c.title === "WTG Commands Guide");
+    if (card) {
+      card.type = "system";
+      card.description = "WTG command reference";
+      card.keys = "";
+      card.entry = `Available WTG Commands:
+
+[settime mm/dd/yyyy time] - Set starting date and time
+  Example: [settime 01/01/2025 12:00 pm]
+
+[advance X units] - Advance time forward
+  Example: [advance 1 hour], [advance 30 minutes], [advance 2 days]
+
+[sleep X units] - Sleep/rest for duration
+  Example: [sleep 8 hours]
+
+[reset] - Reset time to starting values
+
+Mode Switching:
+[normal] - Enable character/location detection (storycards auto-generated)
+[light] - Simple time tracking (lightweight mode)
+
+Entity Formatting (Normal mode only):
+(CharacterName) - Mark character for storycard generation
+((LocationName)) - Mark location for storycard generation`;
+    }
+  }
+  return card;
+}
+
+/**
  * Get a boolean setting from the WTG Settings card (Normal mode only)
  * @param {string} settingName - Name of the setting to retrieve
  * @returns {boolean} The boolean value of the setting, or false if not found

@@ -156,9 +156,9 @@ const modifier = (text) => {
     if (additionalMinutes > 0) {
       state.turnTime = addToTurnTime(lastTT, {minutes: additionalMinutes});
       state.changed = true;
-    } else {
-      state.turnTime = lastTT;
     }
+    // If additionalMinutes is 0, preserve existing state.turnTime
+    // Don't overwrite with potentially stale lastTT from WTG Data
     const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
     state.currentDate = currentDate;
     state.currentTime = currentTime;
