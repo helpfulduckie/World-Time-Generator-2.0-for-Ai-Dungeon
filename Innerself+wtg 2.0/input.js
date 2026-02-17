@@ -245,7 +245,9 @@ const modifier = (text) => {
   }
 
   // ========== INNER-SELF INPUT PROCESSING ==========
+  globalThis.text = modifiedText;
   InnerSelf("input");
+  modifiedText = globalThis.text;
 
   return { text: modifiedText };
 };

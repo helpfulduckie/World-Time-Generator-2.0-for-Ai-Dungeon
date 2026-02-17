@@ -30,8 +30,10 @@ const modifier = (text) => {
 
   // Check if WTG is disabled entirely - if so, just run Inner-Self and return
   if (getWTGBooleanSetting("Disable WTG Entirely")) {
+    globalThis.text = modifiedText;
     InnerSelf("output");
-    return { text: ensureLeadingSpace(text) };
+    modifiedText = globalThis.text;
+    return { text: ensureLeadingSpace(modifiedText) };
   }
 
   // Sync settime initialization flag from storycard if not set in state
