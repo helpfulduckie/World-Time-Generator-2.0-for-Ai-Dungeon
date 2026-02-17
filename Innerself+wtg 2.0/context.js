@@ -159,16 +159,14 @@ ${sleepInstruction} ${advanceInstruction}
   }
 
   // ========== INNER-SELF CONTEXT PROCESSING ==========
-  // InnerSelf modifies the global 'text' variable directly
-  // We need to set global text to our modified text, let InnerSelf process it,
-  // then return the modified global text
-  text = modifiedText;
+  // InnerSelf operates on globalThis.text directly (not the local 'text' parameter).
+  // Sync our WTG-modified text to the global, let InnerSelf process it,
+  // then read back whatever InnerSelf produced.
+  globalThis.text = modifiedText;
   InnerSelf("context");
-  // InnerSelf may have modified global 'text' with brain content
-  // Use the global text if it was modified, otherwise keep our modifiedText
-  const finalText = (text && text !== modifiedText) ? text : modifiedText;
+  modifiedText = globalThis.text;
 
-  return { text: finalText, stop };
+  return { text: modifiedText, stop };
 };
 
 modifier(text);
