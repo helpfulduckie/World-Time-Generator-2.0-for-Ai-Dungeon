@@ -38,7 +38,9 @@ const modifier = (text) => {
       // Use config card values directly - skip full storycard scan
       state.startingDate = timeConfig.startingDate;
       state.startingTime = timeConfig.startingTime;
-      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      if (!state.turnTimeModifiedByCommand) {
+        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      }
       const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
       state.currentDate = currentDate;
       state.currentTime = currentTime;
@@ -78,7 +80,9 @@ const modifier = (text) => {
               } else {
                 state.startingTime = 'Unknown';
               }
-              state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+              if (!state.turnTimeModifiedByCommand) {
+                state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+              }
               const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
               state.currentDate = currentDate;
               state.currentTime = currentTime;
@@ -114,7 +118,9 @@ const modifier = (text) => {
 
     state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
     state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
-    state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+    if (!state.turnTimeModifiedByCommand) {
+        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+    }
     const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
     state.currentDate = currentDate;
     state.currentTime = currentTime;
@@ -319,6 +325,9 @@ const modifier = (text) => {
 
   delete state.insertMarker;
 
+  // Clean up turnTimeModifiedByCommand flag (set in input.js, read in context.js and output.js)
+  delete state.turnTimeModifiedByCommand;
+
   // ============ AUTOCARDS PROCESSING SECOND ============
   modifiedText = AutoCards("output", modifiedText);
 
@@ -329,4 +338,3 @@ const modifier = (text) => {
 };
 
 modifier(text);
-
