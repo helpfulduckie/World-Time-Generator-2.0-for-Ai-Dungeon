@@ -191,6 +191,13 @@ const modifier = (text) => {
           state.turnTimeModifiedByCommand = true;
           setAdvanceCooldown({minutes: 5});
         }
+      } else if (command === 'time') {
+        const ttMarker = formatTurnTime(state.turnTime);
+        messages.push(`[SYSTEM] Current Date and Time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+        state.insertMarker = false;
+        state.changed = true;
+        state.timeCommandUsed = true;
+        modifiedText = '';
       } else if (command === 'reset') {
         let newDate = getCurrentDateFromHistory('', true);
         let newTime = getCurrentTimeFromHistory('', true);
@@ -226,7 +233,7 @@ const modifier = (text) => {
           messages.push(`[No date or time mentions found in history.]`);
         }
       } else {
-        messages.push('[Invalid command. Available: settime, advance, reset, sleep.]');
+        messages.push('[Invalid command. Available: settime, advance, time, reset, sleep.]');
       }
       modifiedText = '';
     }

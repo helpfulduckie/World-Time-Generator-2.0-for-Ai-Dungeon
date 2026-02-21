@@ -205,6 +205,13 @@ const modifier = (text) => {
               setAdvanceCooldown({minutes: 5});
             }
           }
+        } else if (command === 'time') {
+          const ttMarker = formatTurnTime(state.turnTime);
+          wtgMessages.push(`[SYSTEM] Current Date and Time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+          state.insertMarker = false;
+          state.changed = true;
+          state.timeCommandUsed = true;
+          modifiedText = '';
         } else if (command === 'reset') {
           let newDate = getCurrentDateFromHistory('', true);
           let newTime = getCurrentTimeFromHistory('', true);

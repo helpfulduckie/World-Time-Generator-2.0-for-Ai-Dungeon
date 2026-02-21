@@ -13,6 +13,11 @@ const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
+  if (state.timeCommandUsed) {
+    delete state.timeCommandUsed;
+    return { text: '' };
+  }
+
   // Initialize date/time state if not present (mirrors input.js initialization)
   if (state.startingDate === undefined) {
     state.startingDate = '01/01/1900';

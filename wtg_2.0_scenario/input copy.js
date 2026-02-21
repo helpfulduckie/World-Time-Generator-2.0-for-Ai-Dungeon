@@ -269,8 +269,14 @@ const modifier = (text) => {
           } else {
             messages.push(`[No date or time mentions found in history.]`);
           }
+        } else if (command === 'time') {
+          const ttMarker = formatTurnTime(state.turnTime);
+          messages.push(`[SYSTEM] Current Date and Time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+          state.insertMarker = false;
+          state.changed = true;
+          state.timeCommandUsed = true;
         } else {
-          messages.push('[Invalid command. Available: settime, advance, reset, sleep, light, normal.]');
+          messages.push('[Invalid command. Available: settime, advance, time, reset, sleep, light, normal.]');
         }
       }
       modifiedText = '';
@@ -440,4 +446,3 @@ const modifier = (text) => {
 };
 
 modifier(text);
-

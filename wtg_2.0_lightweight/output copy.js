@@ -11,6 +11,11 @@ const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
+  if (state.timeCommandUsed) {
+    delete state.timeCommandUsed;
+    return { text: '' };
+  }
+
   // Initialize mode if not set (default to lightweight)
   if (!state.wtgMode) {
     state.wtgMode = 'lightweight';
