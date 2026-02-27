@@ -1222,9 +1222,6 @@ Timestamp: ${match[7]}
   }
 
   dataCard.entry = (hasInitMarker ? '[SETTIME_INITIALIZED]\n' : '') + newEntry;
-
-  // Invalidate turn data cache since we modified it
-  invalidateTurnDataCache();
 }
 
 /**
