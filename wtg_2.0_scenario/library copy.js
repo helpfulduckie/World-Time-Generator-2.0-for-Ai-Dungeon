@@ -41,13 +41,167 @@ function getWTGTimeConfigCard() {
   return null;
 }
 
+const DEFAULT_WTG_ERA = 'AD';
+const WTG_ERA_TOKEN_PATTERN = '(?:AD|A\\.D\\.|AC|A\\.C\\.|CE|C\\.E\\.|BC|B\\.C\\.|BCE|B\\.C\\.E\\.)';
+const WTG_TURN_TIME_PATTERN = '(\\d+)y(\\d{2})m(\\d{2})d(\\d{2})h(\\d{2})n(\\d{2})s';
+const WTG_DATE_PATTERN = `\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{1,6}(?:\\s*${WTG_ERA_TOKEN_PATTERN})?`;
+
+function normalizeEra(era) {
+  if (!era) return DEFAULT_WTG_ERA;
+  const normalized = String(era).trim().toUpperCase().replace(/\s+/g, '');
+  switch (normalized) {
+    case 'BC':
+    case 'B.C.':
+    case 'BCE':
+    case 'B.C.E.':
+      return 'BC';
+    case 'AD':
+    case 'A.D.':
+    case 'AC':
+    case 'A.C.':
+    case 'CE':
+    case 'C.E.':
+      return 'AD';
+    default:
+      return DEFAULT_WTG_ERA;
+  }
+}
+
+function isEraToken(token) {
+  return typeof token === 'string' && new RegExp(`^${WTG_ERA_TOKEN_PATTERN}$`, 'i').test(token.trim());
+}
+
+function ensureWTGEras() {
+  state.startingEra = normalizeEra(state.startingEra || DEFAULT_WTG_ERA);
+  state.currentEra = normalizeEra(state.currentEra || state.startingEra || DEFAULT_WTG_ERA);
+}
+
+function parseTimeAndEraInput(input, fallbackEra = DEFAULT_WTG_ERA) {
+  const tokens = (input || '').trim().split(/\s+/).filter(Boolean);
+  let era = normalizeEra(fallbackEra);
+  const timeTokens = [];
+  for (const token of tokens) {
+    if (isEraToken(token)) {
+      era = normalizeEra(token);
+    } else {
+      timeTokens.push(token);
+    }
+  }
+  return { era, time: timeTokens.join(' ').trim() };
+}
+
+function parseDateString(dateStr, fallbackEra = DEFAULT_WTG_ERA) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  let normalized = dateStr.trim().replace(/[.-]/g, '/');
+  let era = normalizeEra(fallbackEra);
+  const eraMatch = normalized.match(new RegExp(`\\s*(${WTG_ERA_TOKEN_PATTERN})$`, 'i'));
+  if (eraMatch) {
+    era = normalizeEra(eraMatch[1]);
+    normalized = normalized.slice(0, normalized.length - eraMatch[0].length).trim();
+  }
+  const parts = normalized.split('/');
+  if (parts.length !== 3 || !parts.every(part => /^\d+$/.test(part))) return null;
+  let month = parseInt(parts[0], 10);
+  let day = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  if (month > 12 && day <= 12) [month, day] = [day, month];
+  if (year < 1) return null;
+  return { month, day, year, era };
+}
+
+function formatDateForStorage(monthOrParts, day, year) {
+  if (typeof monthOrParts === 'object' && monthOrParts !== null) {
+    year = monthOrParts.year;
+    day = monthOrParts.day;
+    monthOrParts = monthOrParts.month;
+  }
+  return `${String(monthOrParts).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+}
+
+function formatDateForDisplay(dateStr, era = DEFAULT_WTG_ERA) {
+  const parsed = parseDateString(dateStr, era);
+  if (!parsed) {
+    return `${dateStr || ''}${dateStr ? ` ${normalizeEra(era)}` : normalizeEra(era)}`.trim();
+  }
+  return `${formatDateForStorage(parsed)} ${parsed.era}`;
+}
+
+function formatDateTimeForDisplay(dateStr, timeStr, era = DEFAULT_WTG_ERA) {
+  const dateDisplay = formatDateForDisplay(dateStr, era);
+  return timeStr ? `${dateDisplay} ${timeStr}` : dateDisplay;
+}
+
+function getStartingEra() {
+  return normalizeEra(state.startingEra || DEFAULT_WTG_ERA);
+}
+
+function getCurrentEra() {
+  return normalizeEra(state.currentEra || state.startingEra || DEFAULT_WTG_ERA);
+}
+
+function getStartingDateDisplay() {
+  return formatDateForDisplay(state.startingDate || '01/01/1900', getStartingEra());
+}
+
+function getCurrentDateDisplay() {
+  return formatDateForDisplay(state.currentDate || '01/01/1900', getCurrentEra());
+}
+
+function getCurrentTimestampDisplay() {
+  return formatDateTimeForDisplay(state.currentDate || '01/01/1900', state.currentTime || 'Unknown', getCurrentEra());
+}
+
+function toAstronomicalYear(year, era = DEFAULT_WTG_ERA) {
+  return normalizeEra(era) === 'BC' ? 1 - year : year;
+}
+
+function fromAstronomicalYear(astronomicalYear) {
+  return astronomicalYear <= 0
+    ? { year: 1 - astronomicalYear, era: 'BC' }
+    : { year: astronomicalYear, era: 'AD' };
+}
+
+function createHistoricalDate(month, day, year, era = DEFAULT_WTG_ERA, hour = 0, min = 0, sec = 0) {
+  const date = new Date(Date.UTC(0, month - 1, day, hour, min, sec));
+  date.setUTCFullYear(toAstronomicalYear(year, era), month - 1, day);
+  date.setUTCHours(hour, min, sec, 0);
+  return date;
+}
+
+function getDatePartsFromDate(date) {
+  const yearParts = fromAstronomicalYear(date.getUTCFullYear());
+  return {
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+    year: yearParts.year,
+    era: yearParts.era
+  };
+}
+
+function normalizeSettimeArgs(dateStr, timeStr, fallbackEra = DEFAULT_WTG_ERA) {
+  const timeInfo = parseTimeAndEraInput(timeStr, fallbackEra);
+  const parsedDate = parseDateString(dateStr, timeInfo.era);
+  if (!parsedDate || !isValidDate(parsedDate.month, parsedDate.day, parsedDate.year, parsedDate.era)) {
+    return null;
+  }
+  return {
+    month: parsedDate.month,
+    day: parsedDate.day,
+    year: parsedDate.year,
+    startingDate: formatDateForStorage(parsedDate),
+    startingEra: parsedDate.era,
+    startingTime: timeInfo.time ? normalizeTime(timeInfo.time) : null
+  };
+}
+
 /**
  * Parse the WTG Time Config card for starting date/time
  * Card format:
- *   Starting Date: MM/DD/YYYY
+ *   Starting Date: MM/DD/year (1-6 digits)
+ *   Starting Era: AD/BC
  *   Starting Time: HH:MM AM/PM
  *   Initialized: true/false
- * @returns {Object|null} Object with startingDate, startingTime, initialized or null
+ * @returns {Object|null} Object with startingDate, startingEra, startingTime, initialized or null
  */
 function parseWTGTimeConfig() {
   const configCard = getWTGTimeConfigCard();
@@ -57,15 +211,22 @@ function parseWTGTimeConfig() {
   const content = configCard.entry || configCard.value;
   if (!content) return null;
 
-  const dateMatch = content.match(/Starting Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
-  const timeMatch = content.match(/Starting Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+  const dateMatch = content.match(/Starting Date:\s*([^\n]+)/i);
+  const eraMatch = content.match(/Starting Era:\s*([^\n]+)/i);
+  const timeMatch = content.match(/Starting Time:\s*([^\n]+)/i);
   const initMatch = content.match(/Initialized:\s*(true|false)/i);
 
   if (!dateMatch || !timeMatch) return null;
 
+  const parsedDate = parseDateString(dateMatch[1].trim(), eraMatch ? eraMatch[1].trim() : DEFAULT_WTG_ERA);
+  const timeInfo = parseTimeAndEraInput(timeMatch[1].trim(), parsedDate ? parsedDate.era : DEFAULT_WTG_ERA);
+  const startingTime = timeInfo.time ? normalizeTime(timeInfo.time) : null;
+  if (!parsedDate || !startingTime || !isValidDate(parsedDate.month, parsedDate.day, parsedDate.year, parsedDate.era)) return null;
+
   return {
-    startingDate: dateMatch[1],
-    startingTime: timeMatch[1],
+    startingDate: formatDateForStorage(parsedDate),
+    startingEra: parsedDate.era,
+    startingTime,
     initialized: initMatch ? initMatch[1].toLowerCase() === 'true' : false
   };
 }
@@ -89,28 +250,32 @@ function normalizeTime(str) {
  * @param {number} month - Month (1-12)
  * @param {number} day - Day (1-31)
  * @param {number} year - Year
+ * @param {string} era - Era label (AD/BC)
  * @returns {boolean} True if valid date
  */
-function isValidDate(month, day, year) {
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && (date.getMonth() + 1) === month && date.getDate() === day;
+function isValidDate(month, day, year, era = DEFAULT_WTG_ERA) {
+  if (![month, day, year].every(Number.isInteger) || year < 1) return false;
+  const date = createHistoricalDate(month, day, year, era);
+  const parts = getDatePartsFromDate(date);
+  return parts.month === month && parts.day === day && parts.year === year && parts.era === normalizeEra(era);
 }
 
 /**
  * Advance a date by a specified number of days
  * @param {string} dateStr - Date string in mm/dd/yyyy format
  * @param {number} days - Number of days to advance
- * @returns {string} New date string in mm/dd/yyyy format
+ * @param {string} era - Era label (AD/BC)
+ * @returns {Object} Object with dateStr and era
  */
-function advanceDate(dateStr, days = 0) {
-  let [month, day, year] = dateStr.split('/').map(Number);
-  if (year < 100) year += 2000;
-  const date = new Date(year, month - 1, day);
-  date.setDate(date.getDate() + days);
-  day = String(date.getDate()).padStart(2, '0');
-  month = String(date.getMonth() + 1).padStart(2, '0');
-  year = date.getFullYear();
-  return `${month}/${day}/${year}`;
+function advanceDate(dateStr, days = 0, era = getStartingEra()) {
+  const parsedDate = parseDateString(dateStr, era);
+  if (!parsedDate) {
+    return { dateStr: dateStr || '01/01/1900', era: normalizeEra(era) };
+  }
+  const date = createHistoricalDate(parsedDate.month, parsedDate.day, parsedDate.year, parsedDate.era);
+  date.setUTCDate(date.getUTCDate() + days);
+  const parts = getDatePartsFromDate(date);
+  return { dateStr: formatDateForStorage(parts), era: parts.era };
 }
 
 /**
@@ -218,16 +383,16 @@ function convertTo12Hour(timeStr) {
  */
 function getCurrentDateFromHistory(currentOutput = '', useHistory = false) {
   let currentDate = null;
-  const dateRegex = /\d{1,2}[/.-]\d{1,2}[/.-]\d{2}(?:\d{2})?/g;
+  const dateRegex = new RegExp(WTG_DATE_PATTERN, 'gi');
   let matches = currentOutput.match(dateRegex);
   if (matches && matches.length > 0) {
-    currentDate = matches[matches.length - 1].trim().replace(/[.-]/g, '/');
+    currentDate = formatDateForDisplay(matches[matches.length - 1].trim().replace(/[.-]/g, '/'), getCurrentEra());
   }
   if (!currentDate && useHistory) {
     for (let i = history.length - 1; i >= 0; i--) {
       matches = history[i].text.match(dateRegex);
       if (matches && matches.length > 0) {
-        currentDate = matches[matches.length - 1].trim().replace(/[.-]/g, '/');
+        currentDate = formatDateForDisplay(matches[matches.length - 1].trim().replace(/[.-]/g, '/'), getCurrentEra());
         break;
       }
     }
@@ -278,7 +443,7 @@ function getCurrentTimeFromHistory(currentOutput = '', useHistory = false) {
  * @returns {Object|null} Turn time object or null
  */
 function parseTurnTime(str) {
-  const match = str.match(/(\d{2})y(\d{2})m(\d{2})d(\d{2})h(\d{2})n(\d{2})s/);
+  const match = str.match(new RegExp(WTG_TURN_TIME_PATTERN));
   if (!match) return {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
   return {
     years: parseInt(match[1]),
@@ -331,24 +496,30 @@ function addToTurnTime(tt, add) {
  * @param {string} startingDate - Starting date string
  * @param {string} startingTime - Starting time string
  * @param {Object} tt - Turn time object
- * @returns {Object} Object with currentDate and currentTime
+ * @param {string} startingEra - Era label (AD/BC)
+ * @returns {Object} Object with currentDate, currentEra, and currentTime
  */
-function computeCurrent(startingDate, startingTime, tt) {
+function computeCurrent(startingDate, startingTime, tt, startingEra = getStartingEra()) {
+  startingDate = startingDate || '01/01/1900';
+  startingTime = startingTime || 'Unknown';
   tt = tt || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+  const parsedStartDate = parseDateString(startingDate, startingEra);
+  if (!parsedStartDate) {
+    return { currentDate: startingDate, currentEra: normalizeEra(startingEra), currentTime: startingTime };
+  }
   if (startingTime === 'Unknown') {
     let approxDays = (tt.years || 0) * 365 + (tt.months || 0) * 30 + (tt.days || 0);
-    let currentDate = advanceDate(startingDate, approxDays);
-    return { currentDate, currentTime: 'Unknown' };
+    const advancedDate = advanceDate(startingDate, approxDays, parsedStartDate.era);
+    return { currentDate: advancedDate.dateStr, currentEra: advancedDate.era, currentTime: 'Unknown' };
   }
-  let [month, day, year] = startingDate.split('/').map(Number);
-  let date = new Date(year, month - 1, day);
-  date.setFullYear(date.getFullYear() + (tt.years || 0));
-  date.setMonth(date.getMonth() + (tt.months || 0));
-  date.setDate(date.getDate() + (tt.days || 0));
+  let date = createHistoricalDate(parsedStartDate.month, parsedStartDate.day, parsedStartDate.year, parsedStartDate.era);
+  date.setUTCFullYear(date.getUTCFullYear() + (tt.years || 0));
+  date.setUTCMonth(date.getUTCMonth() + (tt.months || 0));
+  date.setUTCDate(date.getUTCDate() + (tt.days || 0));
   let {time, days} = advanceTime(startingTime, tt.hours || 0, tt.minutes || 0, tt.seconds || 0);
-  date.setDate(date.getDate() + days);
-  let currentDate = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
-  return { currentDate, currentTime: time };
+  date.setUTCDate(date.getUTCDate() + days);
+  const parts = getDatePartsFromDate(date);
+  return { currentDate: formatDateForStorage(parts), currentEra: parts.era, currentTime: time };
 }
 
 /**
@@ -358,6 +529,7 @@ function computeCurrent(startingDate, startingTime, tt) {
  */
 function parseTime(str) {
   if (!str || str === 'Unknown') return {hour: 0, min: 0, sec: 0};
+  str = str.replace(/\s+\(generated\)\s*$/i, '').trim();
   let parts = str.split(/[: ]/);
   let hourStr = parts[0];
   let minStr = '00';
@@ -399,22 +571,25 @@ function parseTime(str) {
  * @param {string} startTimeStr - Start time string
  * @param {string} endStr - End date string
  * @param {string} endTimeStr - End time string
+ * @param {string} startEra - Start era label (AD/BC)
+ * @param {string} endEra - End era label (AD/BC)
  * @returns {Object} Turn time object representing difference
  */
-function getDateDiff(startStr, startTimeStr, endStr, endTimeStr) {
-  let [sMonth, sDay, sYear] = startStr.split('/').map(Number);
-  let startParsed = parseTime(startTimeStr);
-  let start = new Date(sYear, sMonth - 1, sDay, startParsed.hour, startParsed.min, startParsed.sec);
-  let [eMonth, eDay, eYear] = endStr.split('/').map(Number);
-  let endParsed = parseTime(endTimeStr);
-  let end = new Date(eYear, eMonth - 1, eDay, endParsed.hour, endParsed.min, endParsed.sec);
+function getDateDiff(startStr, startTimeStr, endStr, endTimeStr, startEra = getStartingEra(), endEra = getCurrentEra()) {
+  const startDate = parseDateString(startStr, startEra);
+  const endDate = parseDateString(endStr, endEra);
+  if (!startDate || !endDate) return {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+  const startParsed = parseTime(startTimeStr);
+  const endParsed = parseTime(endTimeStr);
+  let start = createHistoricalDate(startDate.month, startDate.day, startDate.year, startDate.era, startParsed.hour, startParsed.min, startParsed.sec);
+  let end = createHistoricalDate(endDate.month, endDate.day, endDate.year, endDate.era, endParsed.hour, endParsed.min, endParsed.sec);
   if (end < start) return {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-  let years = end.getFullYear() - start.getFullYear();
-  let months = end.getMonth() - start.getMonth();
-  let days = end.getDate() - start.getDate();
-  let hours = end.getHours() - start.getHours();
-  let minutes = end.getMinutes() - start.getMinutes();
-  let seconds = end.getSeconds() - start.getSeconds();
+  let years = end.getUTCFullYear() - start.getUTCFullYear();
+  let months = end.getUTCMonth() - start.getUTCMonth();
+  let days = end.getUTCDate() - start.getUTCDate();
+  let hours = end.getUTCHours() - start.getUTCHours();
+  let minutes = end.getUTCMinutes() - start.getUTCMinutes();
+  let seconds = end.getUTCSeconds() - start.getUTCSeconds();
   if (seconds < 0) {
     minutes--;
     seconds += 60;
@@ -429,7 +604,9 @@ function getDateDiff(startStr, startTimeStr, endStr, endTimeStr) {
   }
   if (days < 0) {
     months--;
-    days += new Date(end.getFullYear(), end.getMonth(), 0).getDate();
+    const previousMonth = new Date(end.getTime());
+    previousMonth.setUTCDate(0);
+    days += previousMonth.getUTCDate();
   }
   if (months < 0) {
     years--;
@@ -453,7 +630,7 @@ function getLastTimestampFromWTGData() {
   if (matches.length > 0) {
     const lastMatch = matches[matches.length - 1];
     const timestamp = lastMatch[3];
-    if (timestamp && timestamp.match(/\d{2}y\d{2}m\d{2}d\d{2}h\d{2}n\d{2}s/)) {
+    if (timestamp && timestamp.match(new RegExp(`^${WTG_TURN_TIME_PATTERN}$`))) {
       return parseTurnTime(timestamp);
     }
   }
@@ -465,7 +642,7 @@ function getLastTimestampFromWTGData() {
   if (matches.length > 0) {
     const lastMatch = matches[matches.length - 1];
     const timestamp = lastMatch[7];
-    if (timestamp && timestamp.match(/\d{2}y\d{2}m\d{2}d\d{2}h\d{2}n\d{2}s/)) {
+    if (timestamp && timestamp.match(new RegExp(`^${WTG_TURN_TIME_PATTERN}$`))) {
       return parseTurnTime(timestamp);
     }
   }
@@ -484,7 +661,7 @@ function getLastTurnTimeAndChars(history) {
   let found = false;
   for (let i = history.length - 1; i >= 0; i--) {
     const actionText = history[i].text;
-    const match = actionText.match(/\[\[(\d{2}y\d{2}m\d{2}d\d{2}h\d{2}n\d{2}s)\]\]/);
+    const match = actionText.match(new RegExp(`\\[\\[(${WTG_TURN_TIME_PATTERN})\\]\\]`));
     if (match) {
       lastTT = parseTurnTime(match[1]);
       found = true;
@@ -573,7 +750,7 @@ function getCurrentDateTimeCard() {
     dateTimeCard = storyCards[storyCards.length - 1];
     dateTimeCard.type = "event";
     dateTimeCard.keys = "date,time,current date,current time,clock,hour";
-    dateTimeCard.description = "Commands:\n[settime mm/dd/yyyy time] - Set starting date and time\n[advance N [hours|days|months|years]] - Advance time/date\n[sleep] - Sleep to next morning\n[reset] - Reset to most recent mention in history\n[light] - Switch to lightweight mode\n[normal] - Switch to normal mode";
+    dateTimeCard.description = "Commands:\n[settime mm/dd/year time [BC|AD]] - Set starting date, era, and time (1-6 digit years; BC counts down, AD counts up)\n[advance N [hours|days|months|years]] - Advance time/date\n[sleep] - Sleep to next morning\n[reset] - Reset to most recent mention in history\n[light] - Switch to lightweight mode\n[normal] - Switch to normal mode";
   }
   return dateTimeCard;
 }
@@ -646,8 +823,11 @@ function getWTGCommandsCard() {
       card.keys = "";
       card.entry = `Available WTG Commands:
 
-[settime mm/dd/yyyy time] - Set starting date and time
-  Example: [settime 01/01/2025 12:00 pm]
+[settime mm/dd/year time [BC|AD]] - Set starting date, time, and optional era
+  Years can be 1-6 digits. BC years count down as time advances; AD years count up. AD is standard; AC/CE and BCE are also accepted.
+  Examples: [settime 01/01/2025 12:00 pm]
+            [settime 03/15/44 9:00 am BC]
+            [settime 01/01/7 12:00 am AD]
 
 [advance X units] - Advance time forward
   Example: [advance 1 hour], [advance 30 minutes], [advance 2 days]
@@ -750,18 +930,18 @@ function findOrCreateCard(title) {
 function updateDateTimeCard() {
   const dateTimeCard = getCurrentDateTimeCard();
   const ttForm = formatTurnTime(state.turnTime);
-  let entry = `Starting date: ${state.startingDate || '01/01/1900'}\nStarting time: ${state.startingTime || 'Unknown'}\nCurrent date: ${state.currentDate || '01/01/1900'}\nCurrent time: ${state.currentTime || 'Unknown'}\nTurn time: ${ttForm}`;
+  let entry = `Starting date: ${state.startingDate || '01/01/1900'}\nStarting era: ${getStartingEra()}\nStarting time: ${state.startingTime || 'Unknown'}\nCurrent date: ${state.currentDate || '01/01/1900'}\nCurrent era: ${getCurrentEra()}\nCurrent time: ${state.currentTime || 'Unknown'}\nTurn time: ${ttForm}`;
 
   if (!isLightweightMode()) {
     if (state.sleepWakeTime) {
       const wakeTT = parseTurnTime(state.sleepWakeTime);
-      const {currentDate: wakeDate, currentTime: wakeTime} = computeCurrent(state.startingDate, state.startingTime, wakeTT);
-      entry += `\n\nWoke up on: ${wakeDate} ${wakeTime}`;
+      const {currentDate: wakeDate, currentEra: wakeEra, currentTime: wakeTime} = computeCurrent(state.startingDate, state.startingTime, wakeTT);
+      entry += `\n\nWoke up on: ${formatDateTimeForDisplay(wakeDate, wakeTime, wakeEra)}`;
     }
     if (state.advanceEndTime) {
       const advanceTT = parseTurnTime(state.advanceEndTime);
-      const {currentDate: advanceDate, currentTime: advanceTime} = computeCurrent(state.startingDate, state.startingTime, advanceTT);
-      entry += `\n\nAdvanced until: ${advanceDate} ${advanceTime}`;
+      const {currentDate: advanceDate, currentEra: advanceEra, currentTime: advanceTime} = computeCurrent(state.startingDate, state.startingTime, advanceTT);
+      entry += `\n\nAdvanced until: ${formatDateTimeForDisplay(advanceDate, advanceTime, advanceEra)}`;
     }
   }
 
@@ -949,10 +1129,11 @@ function parseDateTime(dateStr, timeStr) {
   if (!timeStr || typeof timeStr !== 'string') {
     return null;
   }
-  const [month, day, year] = dateStr.split('/').map(Number);
+  const parsedDate = parseDateString(dateStr, getCurrentEra());
+  if (!parsedDate) return null;
   const time = parseTime(timeStr);
   if (!time) return null;
-  return new Date(year, month - 1, day, time.hour, time.min, time.sec);
+  return createHistoricalDate(parsedDate.month, parsedDate.day, parsedDate.year, parsedDate.era, time.hour, time.min, time.sec);
 }
 
 /**
@@ -1034,7 +1215,7 @@ function cleanupStoryCardsByTimestamp(currentDate, currentTime) {
     if (card.title === "WTG Data" || card.title === "Current Date and Time" || !card.entry) {
       continue;
     }
-    const discoveredMatch = card.entry.match(/(?:Discovered on|Met on|Visited) (\d{1,2}\/\d{1,2}\/\d{4})\s+(.+)/);
+    const discoveredMatch = card.entry.match(new RegExp(`(?:Discovered on|Met on|Visited) (${WTG_DATE_PATTERN})\\s+(.+)`, 'i'));
     if (discoveredMatch) {
       const cardDate = discoveredMatch[1];
       const cardTime = discoveredMatch[2];
@@ -1052,7 +1233,8 @@ function cleanupStoryCardsByTimestamp(currentDate, currentTime) {
  * @param {string} newTime - New time string in hh:mm AM/PM format
  */
 function updateAllStoryCardTimestamps(newDate, newTime) {
-  const timestamp = `${newDate} ${newTime}`;
+  const timestamp = formatDateTimeForDisplay(newDate, newTime, getCurrentEra());
+  const timestampLineRegex = /((?:Discovered on|Met on|Visited)) [^\n]+?(\s+\(generated\))?$/m;
   for (let i = 0; i < storyCards.length; i++) {
     const card = storyCards[i];
     if (card.title === "WTG Data" || card.title === "Current Date and Time") {
@@ -1060,9 +1242,9 @@ function updateAllStoryCardTimestamps(newDate, newTime) {
     }
     if (card.entry && (card.entry.includes("Discovered on") || card.entry.includes("Met on") || card.entry.includes("Visited"))) {
       if (card.entry.includes("Unknown")) {
-        card.entry = card.entry.replace(/(?:Discovered on|Met on|Visited) \d{1,2}\/\d{1,2}\/\d{4}\s+Unknown/, `Discovered on ${timestamp}`);
+        card.entry = card.entry.replace(timestampLineRegex, (match, verb, generatedLabel = '') => `${verb} ${timestamp}${generatedLabel || ''}`);
       } else if (card.entry.includes("01/01/1900")) {
-        card.entry = card.entry.replace(/(?:Discovered on|Met on|Visited) 01\/01\/1900\s+[\d:]+ [AP]M/, `Discovered on ${timestamp}`);
+        card.entry = card.entry.replace(timestampLineRegex, (match, verb, generatedLabel = '') => `${verb} ${timestamp}${generatedLabel || ''}`);
       }
     }
   }
@@ -1294,13 +1476,13 @@ function updateCooldownCard() {
   let entry = "";
   if (state.sleepAvailableAtTT) {
     const sleepTT = parseTurnTime(state.sleepAvailableAtTT);
-    const {currentDate: sleepDate, currentTime: sleepTime} = computeCurrent(state.startingDate, state.startingTime, sleepTT);
-    entry += `Sleep available after: ${sleepDate} ${sleepTime}\n`;
+    const {currentDate: sleepDate, currentEra: sleepEra, currentTime: sleepTime} = computeCurrent(state.startingDate, state.startingTime, sleepTT);
+    entry += `Sleep available after: ${formatDateTimeForDisplay(sleepDate, sleepTime, sleepEra)}\n`;
   }
   if (state.advanceAvailableAtTT) {
     const advanceTT = parseTurnTime(state.advanceAvailableAtTT);
-    const {currentDate: advanceDate, currentTime: advanceTime} = computeCurrent(state.startingDate, state.startingTime, advanceTT);
-    entry += `Advance available after: ${advanceDate} ${advanceTime}\n`;
+    const {currentDate: advanceDate, currentEra: advanceEra, currentTime: advanceTime} = computeCurrent(state.startingDate, state.startingTime, advanceTT);
+    entry += `Advance available after: ${formatDateTimeForDisplay(advanceDate, advanceTime, advanceEra)}\n`;
   }
   cooldownCard.entry = entry.trim();
 }

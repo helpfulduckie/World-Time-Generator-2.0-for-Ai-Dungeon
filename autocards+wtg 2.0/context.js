@@ -10,6 +10,8 @@ const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
+  ensureWTGEras();
+
   // Check if WTG is disabled entirely - still process AutoCards
   if (getWTGBooleanSetting("Disable WTG Entirely")) {
     let [modText, stopVal] = AutoCards("context", text, stop);
@@ -83,7 +85,7 @@ const modifier = (text) => {
   let useLastTTDirectly = false;
   if (history.length > 0) {
     const lastActionText = history[history.length - 1].text;
-    if (lastActionText.match(/\[\[(\d{2}y\d{2}m\d{2}d\d{2}h\d{2}n\d{2}s)\]\]/)) {
+    if (lastActionText.match(new RegExp(`\\[\\[(${WTG_TURN_TIME_PATTERN})\\]\\]`))) {
       useLastTTDirectly = true;
     }
   }
@@ -96,8 +98,9 @@ const modifier = (text) => {
   } else if (useLastTTDirectly) {
     // User command provided exact timestamp - use it without modification
     state.turnTime = lastTT;
-    const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+    const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
     state.currentDate = currentDate;
+    state.currentEra = currentEra;
     state.currentTime = currentTime;
     state.changed = true;
   } else if (markerFound) {
@@ -127,8 +130,9 @@ const modifier = (text) => {
     }
     // If additionalMinutes is 0, preserve existing state.turnTime
     // Don't overwrite with potentially stale lastTT from WTG Data
-    const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+    const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
     state.currentDate = currentDate;
+    state.currentEra = currentEra;
     state.currentTime = currentTime;
   } else {
     // No marker found in history - preserve existing state.turnTime
@@ -148,8 +152,9 @@ const modifier = (text) => {
 
       if (additionalMinutes > 0) {
         state.turnTime = addToTurnTime(state.turnTime, {minutes: additionalMinutes});
-        const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+        const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
         state.currentDate = currentDate;
+        state.currentEra = currentEra;
         state.currentTime = currentTime;
         state.changed = true;
       }
@@ -186,7 +191,7 @@ ${sleepInstruction} ${advanceInstruction}
   // Add current date and time to context (only if settime has been initialized)
   let dateTimeInjection = '';
   if (state.settimeInitialized && state.currentDate !== '01/01/1900' && state.currentTime !== 'Unknown') {
-    dateTimeInjection = `\nCurrent date: ${state.currentDate}; Current time: ${state.currentTime}`;
+    dateTimeInjection = `\nCurrent date: ${getCurrentDateDisplay()}; Current time: ${state.currentTime}`;
   }
   modifiedText = modifiedText + dateTimeInjection;
 

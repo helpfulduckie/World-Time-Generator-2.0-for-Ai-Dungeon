@@ -41,21 +41,26 @@ The World Time Generator (WTG) is a comprehensive scripting system for AI Dungeo
 
 These commands work in all versions of WTG:
 
-#### `[settime mm/dd/yyyy time]`
-**Set starting date and time**
+#### `[settime mm/dd/year time [BC|AD]]`
+**Set starting date, era, and time**
 
 ```
 [settime 06/15/2023 8:00 AM]
 [settime 12/25/2024 11:30 PM]
-[settime 01/01/1900 12:00 am]
+[settime 03/15/44 9:00 am BC]
+[settime 01/01/7 12:00 am AD]
 ```
+
+- Years support 1-6 digits, including single-digit years
+- `BC` years count down as time advances; `AD` years count up
+- `AD` is the standard era label; `AC` and `CE` are also accepted as AD aliases, and `BCE` is accepted as a BC alias
 
 **NEW: Storycard [settime] Detection (v2.1.23)**
 You can also add `[settime]` directly into any storycard entry! When the scenario starts, the script will automatically detect it, set the time, remove the command from the storycard, and skip the opening prompt.
 
 **Example:**
 ```
-[settime 12/25/2024 6:00 am]
+[settime 12/25/2024 6:00 am AD]
 It's Christmas morning in Victorian London...
 ```
 
@@ -65,14 +70,14 @@ For scenarios with hundreds of storycards (900+), embedding `[settime]` in story
 
 **How to use:**
 1. Import `wtg-time-config-template.json` into your scenario's storycards
-2. Edit the "WTG Time Config" card to set your desired starting date and time
+2. Edit the "WTG Time Config" card to set your desired starting date, era, and time (the year can be 1-6 digits; BC counts down, AD counts up)
 3. The script will read time directly from this card without scanning other storycards
 
 **Template format:**
 ```json
 {
   "title": "WTG Time Config",
-  "value": "Starting Date: 01/01/2024\nStarting Time: 12:00 PM\nInitialized: true",
+  "value": "Starting Date: 01/01/2024\nStarting Era: AD\nStarting Time: 12:00 PM\nInitialized: true",
   "type": "system"
 }
 ```
@@ -560,9 +565,10 @@ If your scenario has hundreds of storycards, import the **WTG Time Config** card
 
 1. Download `wtg-time-config-template.json` from this repository
 2. Import it into your scenario's storycards
-3. Edit the "WTG Time Config" card to set your starting date/time:
+3. Edit the "WTG Time Config" card to set your starting date, era, and time:
    ```
    Starting Date: 06/15/2023
+   Starting Era: AD
    Starting Time: 8:00 AM
    Initialized: true
    ```
@@ -577,7 +583,7 @@ If your scenario has hundreds of storycards, import the **WTG Time Config** card
 1. **Start your adventure** from the scenario
 2. **Set initial time** (required):
    ```
-   [settime 06/15/2023 8:00 AM]
+   [settime 06/15/2023 8:00 AM AD]
    ```
 3. **Start playing!** Time will track automatically
 
@@ -748,4 +754,3 @@ This is a community-created tool for enhancing AI Dungeon experiences. Not offic
 ---
 
 **Made for the AI Dungeon community**
-

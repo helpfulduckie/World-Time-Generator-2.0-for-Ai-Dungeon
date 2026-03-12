@@ -21,8 +21,10 @@ const modifier = (text) => {
   // Initialize state if not present
   if (state.startingDate === undefined) {
     state.startingDate = '01/01/1900';
+    state.startingEra = DEFAULT_WTG_ERA;
     state.startingTime = 'Unknown';
     state.currentDate = '01/01/1900';
+    state.currentEra = DEFAULT_WTG_ERA;
     state.currentTime = 'Unknown';
     state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
     state.settimeInitialized = false;
@@ -30,6 +32,8 @@ const modifier = (text) => {
       state.timeMultiplier = 1.0;
     }
   }
+
+  ensureWTGEras();
 
   state.changed = state.changed || false;
   state.insertMarker = false;
@@ -47,10 +51,12 @@ const modifier = (text) => {
     const timeConfig = parseWTGTimeConfig();
     if (timeConfig && timeConfig.initialized) {
       state.startingDate = timeConfig.startingDate;
+      state.startingEra = timeConfig.startingEra;
       state.startingTime = timeConfig.startingTime;
       state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       // Mark settime as initialized (persists marker to WTG Data card)
       markSettimeAsInitialized();
@@ -78,10 +84,12 @@ const modifier = (text) => {
       const day = now.getDate();
       const year = now.getFullYear();
       state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+      state.startingEra = DEFAULT_WTG_ERA;
       state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
       state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       markSettimeAsInitialized();
       updateDateTimeCard();
@@ -105,22 +113,24 @@ const modifier = (text) => {
       let sleepMinutes = Math.floor(Math.random() * 60);
       let add = {hours: sleepHours, minutes: sleepMinutes};
       state.turnTime = addToTurnTime(state.turnTime, add);
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       let wakeMessage = (add.days > 0 || state.turnTime.days > 0) ? "the next day" : "later that day";
       const ttMarker = formatTurnTime(state.turnTime);
-      messages.push(`[SYSTEM] You go to sleep and wake up ${wakeMessage} on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
+      messages.push(`[SYSTEM] You go to sleep and wake up ${wakeMessage} on ${getCurrentDateDisplay()} at ${state.currentTime}. [[${ttMarker}]]`);
     } else {
       // When time is Unknown, set it to 8:00 AM and reset turn time
       state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
       state.turnTime = addToTurnTime(state.turnTime, {days: 1});
       state.startingTime = "8:00 AM";
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       const ttMarker = formatTurnTime(state.turnTime);
-      messages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
+      messages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${getCurrentDateDisplay()} at ${state.currentTime}. [[${ttMarker}]]`);
     }
     state.insertMarker = true;
     state.changed = true;
@@ -158,27 +168,24 @@ const modifier = (text) => {
           let dateStr = parts[1];
           let timeStr = parts.slice(2).join(' ');
           if (dateStr) {
-            dateStr = dateStr.replace(/[.-]/g, '/');
-            let [part1, part2, year] = dateStr.split('/').map(Number);
-            if (year < 100) year += 2000;
-            let month = part1;
-            let day = part2;
-            if (month > 12 && day <= 12) [month, day] = [day, part1];
-            if (isValidDate(month, day, year)) {
-              state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
-              if (timeStr) {
-                state.startingTime = normalizeTime(timeStr);
+            const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, getCurrentEra());
+            if (parsedSettime) {
+              state.startingDate = parsedSettime.startingDate;
+              state.startingEra = parsedSettime.startingEra;
+              if (parsedSettime.startingTime) {
+                state.startingTime = parsedSettime.startingTime;
               }
               state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-              const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+              const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
               state.currentDate = currentDate;
+              state.currentEra = currentEra;
               state.currentTime = currentTime;
 
             // Update timestamps in all existing storycards to reflect the new time
             updateAllStoryCardTimestamps(state.currentDate, state.currentTime);
 
             const ttMarker = formatTurnTime(state.turnTime);
-            messages.push(`[SYSTEM] Starting date and time set to ${state.startingDate} ${state.startingTime}. [[${ttMarker}]]`);
+            messages.push(`[SYSTEM] Starting date and time set to ${getStartingDateDisplay()} ${state.startingTime}. [[${ttMarker}]]`);
             // Mark settime as initialized
             markSettimeAsInitialized();
             // Initialize storycards
@@ -192,11 +199,11 @@ const modifier = (text) => {
             state.insertMarker = true;
             state.changed = true;
             // Clear any existing AI command cooldowns when user resets time (Normal mode only)
-            if (!isLightweightMode()) {
-              clearCommandCooldowns("user settime command");
-            }
+             if (!isLightweightMode()) {
+               clearCommandCooldowns("user settime command");
+             }
             } else {
-              messages.push(`[Invalid date: ${dateStr}. Use mm/dd/yyyy or dd/mm/yyyy.]`);
+              messages.push(`[Invalid date: ${dateStr}. Use mm/dd/year [BC|AD] or dd/mm/year [BC|AD]. The year can be 1-6 digits, BC counts down, AD counts up, and AC/CE/BCE aliases are also accepted.]`);
             }
           }
         } else if (command === 'advance') {
@@ -220,11 +227,12 @@ const modifier = (text) => {
               add.hours = amount;
             }
           state.turnTime = addToTurnTime(state.turnTime, add);
-          const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+          const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
           state.currentDate = currentDate;
+          state.currentEra = currentEra;
           state.currentTime = currentTime;
           const ttMarker = formatTurnTime(state.turnTime);
-          messages.push(`[SYSTEM] Advanced ${amount} ${unit}${extraMinutes ? ` and ${extraMinutes} minutes` : ''}. New date/time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+          messages.push(`[SYSTEM] Advanced ${amount} ${unit}${extraMinutes ? ` and ${extraMinutes} minutes` : ''}. New date/time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`);
           state.insertMarker = true;
           state.changed = true;
           // Flag to prevent context.js from overwriting turnTime (new input isn't in history yet)
@@ -239,16 +247,14 @@ const modifier = (text) => {
           let newTime = getCurrentTimeFromHistory('', true);
           let valid = false;
           if (newDate) {
-            let [part1, part2, year] = newDate.split('/').map(Number);
-            if (year < 100) year += 2000;
-            let month = part1;
-            let day = part2;
-            if (month > 12 && day <= 12) [month, day] = [day, part1];
-            if (isValidDate(month, day, year)) {
-              let tempCurrentDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+            const parsedResetDate = parseDateString(newDate, getCurrentEra());
+            if (parsedResetDate && isValidDate(parsedResetDate.month, parsedResetDate.day, parsedResetDate.year, parsedResetDate.era)) {
+              let tempCurrentDate = formatDateForStorage(parsedResetDate);
+              let tempCurrentEra = parsedResetDate.era;
               let tempCurrentTime = newTime ? normalizeTime(newTime) : state.startingTime;
-              state.turnTime = getDateDiff(state.startingDate, state.startingTime, tempCurrentDate, tempCurrentTime);
+              state.turnTime = getDateDiff(state.startingDate, state.startingTime, tempCurrentDate, tempCurrentTime, state.startingEra, tempCurrentEra);
               state.currentDate = tempCurrentDate;
+              state.currentEra = tempCurrentEra;
               state.currentTime = tempCurrentTime;
 
               // Update timestamps in all existing storycards to reflect the reset time
@@ -259,7 +265,7 @@ const modifier = (text) => {
           }
         if (valid) {
           const ttMarker = formatTurnTime(state.turnTime);
-          messages.push(`[SYSTEM] Date and time reset to most recent mention: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+          messages.push(`[SYSTEM] Date and time reset to most recent mention: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`);
           state.insertMarker = true;
           state.changed = true;
           // Clear any existing AI command cooldowns when user resets time (Normal mode only)
@@ -271,7 +277,7 @@ const modifier = (text) => {
           }
         } else if (command === 'time') {
           const ttMarker = formatTurnTime(state.turnTime);
-          messages.push(`[SYSTEM] Current Date and Time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+          messages.push(`[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`);
           state.insertMarker = false;
           state.changed = true;
           state.timeCommandUsed = true;
@@ -354,7 +360,7 @@ const modifier = (text) => {
             card.keys = keys.join(',');
             card.entry = `Location: ${title}. First mentioned in player input: ${fullInputText}`;
             if (!hasTimestamp(card)) {
-              addTimestampToCard(card, `${state.currentDate} ${state.currentTime}`);
+              addTimestampToCard(card, getCurrentTimestampDisplay());
             }
           }
         }
@@ -384,7 +390,7 @@ const modifier = (text) => {
             card.keys = keys.join(',');
             card.entry = `Character: ${title}. First mentioned in player input: ${fullInputText}`;
             if (!hasTimestamp(card)) {
-              addTimestampToCard(card, `${state.currentDate} ${state.currentTime}`);
+              addTimestampToCard(card, getCurrentTimestampDisplay());
             }
           }
         }

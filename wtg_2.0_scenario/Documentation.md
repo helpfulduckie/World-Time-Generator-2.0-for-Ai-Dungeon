@@ -137,9 +137,10 @@ Works in both Lightweight and Normal modes.
 
 **How It Works**:
 - At scenario start (action count ≤ 1), all storycards are scanned for `[settime date time]` commands
-- Format: `[settime mm/dd/yyyy time]` (e.g., `[settime 08/15/2024 3:30 pm]`)
+- Format: `[settime mm/dd/year time [BC|AD]]` (e.g., `[settime 08/15/2024 3:30 pm AD]`, `[settime 03/15/44 9:00 am BC]`)
 - Supports various date separators: `/`, `-`, `.`
-- Supports both 2-digit and 4-digit years
+- Supports 1-6 digit years, including single-digit years
+- BC years count down as time advances; AD years count up
 - Time formats: `3:30 pm`, `3 pm`, `15:30`, etc.
 - Once found and processed, the command is removed from the storycard
 - The opening prompt is skipped, and the AI generates the first response immediately
@@ -225,7 +226,7 @@ This is a combined version of WTG 2.0 (Normal Mode) and WTG 2.0 Lightweight that
 ### Initial Setup Prompt
 When starting a new adventure, users will see:
 ```
-Please switch to story mode and use the command, [settime mm/dd/yyyy time] to set a custom starting date and time. (eg: [settime 01/01/1900 12:00 am])
+Use [settime mm/dd/year time [BC|AD]] to set a custom starting date, era, and time. Years can be 1-6 digits (for example 7 or 44), BC years count down as time advances, and AD years count up. AC/CE and BCE also work.
 
 To enable all of the features, use the command [normal]. You can go back to lightweight mode by using the command [light].
 
@@ -267,8 +268,9 @@ Commands can be combined in a single action for convenience. For example:
 - **[normal]** - Switch to Normal mode (enables all advanced features)
 
 ### Time Management Commands
-- **[settime mm/dd/yyyy time]** - Set starting date and time
-  - Example: `[settime 06/15/2023 3:30 PM]`
+- **[settime mm/dd/year time [BC|AD]]** - Set starting date, era, and time
+  - Example: `[settime 06/15/2023 3:30 PM AD]`, `[settime 03/15/44 9:00 AM BC]`
+  - BC years count down as time advances; AD years count up
   - Clears all cooldowns (Normal mode only)
   - Updates all existing storycard timestamps
   
@@ -419,9 +421,9 @@ Internal format: `00y00m00d00h00n00s`
 - Example: `00y00m05d12h30n00s` = 5 days, 12 hours, 30 minutes
 
 ### Timestamp Format
-- **Date**: mm/dd/yyyy (e.g., 06/15/2023)
+- **Date**: mm/dd/year with optional era (e.g., 06/15/2023 AD or 03/15/44 BC)
 - **Time**: hh:mm AM/PM (e.g., 3:45 PM)
-- **Combined**: "Met on 06/15/2023 3:45 PM"
+- **Combined**: "Met on 03/15/44 BC 9:45 PM"
 
 ### System Storycards
 
@@ -598,4 +600,3 @@ Potential future additions:
 - Custom time rates for Lightweight mode
 - Mode-specific settings preservation
 - Import/export of mode configurations
-
