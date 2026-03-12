@@ -74,7 +74,7 @@ const modifier = (text) => {
             const settimeArgs = settimeMatch[1].trim().split(/\s+/);
             const dateStr = settimeArgs[0];
             const timeStr = settimeArgs.slice(1).join(' ');
-            const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, getCurrentEra());
+            const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
 
             if (parsedSettime) {
               // Set the starting date and time
@@ -137,7 +137,7 @@ const modifier = (text) => {
 
   if (state.startingDate === '01/01/1900' && state.startingTime === 'Unknown') {
     state.initialMessageShown = true;
-    modifiedText = ' Use [settime mm/dd/year time [BC|AD]] to set a custom starting date, era, and time. Years can be 1-6 digits (for example 7 or 44), BC years count down as time advances, and AD years count up. AC/CE and BCE also work. Or just take any action to auto-initialize with the current real-world time.\n\nThis version combines WTG time tracking with AutoCards for automatic storycard generation.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)';
+    modifiedText = ' Use [settime 06/15/2023 8:00 AM AD] to set a custom starting date, era, and time. For BC dates, use something like [settime 03/15/44 9:00 AM BC]. If you leave the era off, [settime 06/15/2023 8:00 AM] defaults to AD. Years can be 1-6 digits (for example 7 or 44).\n\nThis version combines WTG time tracking with AutoCards for automatic storycard generation.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)';
     return {text: ensureLeadingSpace(modifiedText)};
   }
 

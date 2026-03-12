@@ -260,7 +260,7 @@ function getWTGTimeConfigCard() {
 }
 
 const DEFAULT_WTG_ERA = 'AD';
-const WTG_ERA_TOKEN_PATTERN = '(?:AD|A\\.D\\.|AC|A\\.C\\.|CE|C\\.E\\.|BC|B\\.C\\.|BCE|B\\.C\\.E\\.)';
+const WTG_ERA_TOKEN_PATTERN = '(?:AD|A\\.D\\.|CE|C\\.E\\.|BC|B\\.C\\.|BCE|B\\.C\\.E\\.)';
 const WTG_TURN_TIME_PATTERN = '(\\d+)y(\\d{2})m(\\d{2})d(\\d{2})h(\\d{2})n(\\d{2})s';
 const WTG_DATE_PATTERN = `\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{1,6}(?:\\s*${WTG_ERA_TOKEN_PATTERN})?`;
 
@@ -275,8 +275,6 @@ function normalizeEra(era) {
       return 'BC';
     case 'AD':
     case 'A.D.':
-    case 'AC':
-    case 'A.C.':
     case 'CE':
     case 'C.E.':
       return 'AD';
@@ -1121,7 +1119,7 @@ function getCurrentDateTimeCard() {
     if (dateTimeCard) {
       dateTimeCard.type = "event";
       dateTimeCard.keys = "date,time,current date,current time,clock,hour";
-      dateTimeCard.description = "Commands:\n[settime mm/dd/year time [BC|AD]] - Set starting date, era, and time (1-6 digit years; BC counts down, AD counts up)\n[advance N [hours|days|months|years]] - Advance time/date\n[sleep] - Sleep to next morning\n[reset] - Reset to most recent mention in history";
+      dateTimeCard.description = "Commands:\n[settime mm/dd/year time AD] - Set starting date, era, and time (use BC for BC dates, or omit the era to default to AD; years can be 1-6 digits)\n[advance N [hours|days|months|years]] - Advance time/date\n[sleep] - Sleep to next morning\n[reset] - Reset to most recent mention in history";
     }
   }
   return dateTimeCard;
@@ -1331,11 +1329,13 @@ function getWTGCommandsCard() {
       card.keys = "";
       card.entry = `Available WTG Commands:
 
-[settime mm/dd/year time [BC|AD]] - Set starting date, time, and optional era
-  Years can be 1-6 digits. BC years count down as time advances; AD years count up. AD is standard; AC/CE and BCE are also accepted.
+[settime mm/dd/year time AD] - Set starting date, time, and optional era
+  Use BC instead of AD for BC dates, or leave the era off entirely to default to AD.
+  Years can be 1-6 digits. BC years count down as time advances; AD years count up. AD is standard; CE and BCE are also accepted.
   Examples: [settime 01/01/2025 12:00 pm]
             [settime 03/15/44 9:00 am BC]
             [settime 01/01/7 12:00 am AD]
+            [settime 06/15/2023 8:00 am]
 
 [advance X units] - Advance time forward
   Example: [advance 1 hour], [advance 30 minutes], [advance 2 days]

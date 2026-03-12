@@ -139,7 +139,7 @@ const modifier = (text) => {
           const dateStr = parts[1];
           const timeStr = parts.slice(2).join(' ');
           if (dateStr) {
-            const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, getCurrentEra());
+            const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
             if (parsedSettime) {
               state.startingDate = parsedSettime.startingDate;
               state.startingEra = parsedSettime.startingEra;
@@ -163,7 +163,7 @@ const modifier = (text) => {
                 clearCommandCooldowns('user settime command');
               }
             } else {
-              wtgMessages.push(`[Invalid date: ${dateStr}. Use mm/dd/year [BC|AD] or dd/mm/year [BC|AD]. The year can be 1-6 digits, BC counts down, AD counts up, and AC/CE/BCE aliases are also accepted.]`);
+              wtgMessages.push(`[Invalid date: ${dateStr}. Example commands: [settime 06/15/2023 8:00 AM AD], [settime 03/15/44 9:00 AM BC], or [settime 06/15/2023 8:00 AM] to default to AD.]`);
             }
           }
         } else if (command === 'advance') {

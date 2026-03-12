@@ -137,7 +137,7 @@ Works in both Lightweight and Normal modes.
 
 **How It Works**:
 - At scenario start (action count ≤ 1), all storycards are scanned for `[settime date time]` commands
-- Format: `[settime mm/dd/year time [BC|AD]]` (e.g., `[settime 08/15/2024 3:30 pm AD]`, `[settime 03/15/44 9:00 am BC]`)
+- Format: `[settime mm/dd/year time AD]` or `[settime mm/dd/year time BC]` (e.g., `[settime 08/15/2024 3:30 pm AD]`, `[settime 03/15/44 9:00 am BC]`, or `[settime 08/15/2024 3:30 pm]` to default to AD)
 - Supports various date separators: `/`, `-`, `.`
 - Supports 1-6 digit years, including single-digit years
 - BC years count down as time advances; AD years count up
@@ -226,7 +226,7 @@ This is a combined version of WTG 2.0 (Normal Mode) and WTG 2.0 Lightweight that
 ### Initial Setup Prompt
 When starting a new adventure, users will see:
 ```
-Use [settime mm/dd/year time [BC|AD]] to set a custom starting date, era, and time. Years can be 1-6 digits (for example 7 or 44), BC years count down as time advances, and AD years count up. AC/CE and BCE also work.
+Use [settime 06/15/2023 8:00 AM AD] to set a custom starting date, era, and time. For BC dates, use [settime 03/15/44 9:00 AM BC]. If you leave the era off, [settime 06/15/2023 8:00 AM] defaults to AD. Years can be 1-6 digits (for example 7 or 44).
 
 To enable all of the features, use the command [normal]. You can go back to lightweight mode by using the command [light].
 
@@ -268,8 +268,8 @@ Commands can be combined in a single action for convenience. For example:
 - **[normal]** - Switch to Normal mode (enables all advanced features)
 
 ### Time Management Commands
-- **[settime mm/dd/year time [BC|AD]]** - Set starting date, era, and time
-  - Example: `[settime 06/15/2023 3:30 PM AD]`, `[settime 03/15/44 9:00 AM BC]`
+- **[settime mm/dd/year time AD]** - Set starting date, era, and time
+  - Example: `[settime 06/15/2023 3:30 PM AD]`, `[settime 03/15/44 9:00 AM BC]`, or `[settime 06/15/2023 3:30 PM]` to default to AD
   - BC years count down as time advances; AD years count up
   - Clears all cooldowns (Normal mode only)
   - Updates all existing storycard timestamps

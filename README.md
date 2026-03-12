@@ -41,7 +41,7 @@ The World Time Generator (WTG) is a comprehensive scripting system for AI Dungeo
 
 These commands work in all versions of WTG:
 
-#### `[settime mm/dd/year time [BC|AD]]`
+#### `[settime mm/dd/year time AD]`
 **Set starting date, era, and time**
 
 ```
@@ -53,7 +53,8 @@ These commands work in all versions of WTG:
 
 - Years support 1-6 digits, including single-digit years
 - `BC` years count down as time advances; `AD` years count up
-- `AD` is the standard era label; `AC` and `CE` are also accepted as AD aliases, and `BCE` is accepted as a BC alias
+- If you omit the era, it defaults to `AD`
+- `AD` is the standard era label; `CE` is also accepted as an AD alias, and `BCE` is accepted as a BC alias
 
 **NEW: Storycard [settime] Detection (v2.1.23)**
 You can also add `[settime]` directly into any storycard entry! When the scenario starts, the script will automatically detect it, set the time, remove the command from the storycard, and skip the opening prompt.

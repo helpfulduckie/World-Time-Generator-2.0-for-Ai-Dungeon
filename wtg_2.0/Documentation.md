@@ -108,7 +108,7 @@ function isLightweightMode() {
 
 **How It Works**:
 - At scenario start (action count ≤ 1), all storycards are scanned for `[settime date time]` commands
-- Format: `[settime mm/dd/year time [BC|AD]]` (e.g., `[settime 08/15/2024 3:30 pm AD]`, `[settime 03/15/44 9:00 am BC]`)
+- Format: `[settime mm/dd/year time AD]` or `[settime mm/dd/year time BC]` (e.g., `[settime 08/15/2024 3:30 pm AD]`, `[settime 03/15/44 9:00 am BC]`, or `[settime 08/15/2024 3:30 pm]` to default to AD)
 - Supports various date separators: `/`, `-`, `.`
 - Supports 1-6 digit years, including single-digit years
 - BC years count down as time advances; AD years count up
