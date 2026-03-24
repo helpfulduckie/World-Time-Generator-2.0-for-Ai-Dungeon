@@ -141,7 +141,35 @@ const modifier = (text) => {
       const parts = commandEntry.split(/\s+/);
       const command = parts[0].toLowerCase();
 
-      if (command === 'settime') {
+      if (command === 'sleep') {
+        if (state.currentTime !== 'Unknown' && /\d/.test(state.currentTime)) {
+          let sleepHours = Math.floor(Math.random() * 3) + 6;
+          let sleepMinutes = Math.floor(Math.random() * 60);
+          let add = {hours: sleepHours, minutes: sleepMinutes};
+          state.turnTime = addToTurnTime(state.turnTime, add);
+          const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+          state.currentDate = currentDate;
+          state.currentEra = currentEra;
+          state.currentTime = currentTime;
+          let wakeMessage = (add.days > 0 || state.turnTime.days > 0) ? "the next day" : "later that day";
+          const ttMarker = formatTurnTime(state.turnTime);
+          messages.push(`[SYSTEM] You go to sleep and wake up ${wakeMessage} on ${getCurrentDateDisplay()} at ${state.currentTime}. [[${ttMarker}]]. `);
+        } else {
+          state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+          state.turnTime = addToTurnTime(state.turnTime, {days: 1});
+          state.startingTime = "8:00 AM";
+          const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+          state.currentDate = currentDate;
+          state.currentEra = currentEra;
+          state.currentTime = currentTime;
+          const ttMarker = formatTurnTime(state.turnTime);
+          messages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${getCurrentDateDisplay()} at ${state.currentTime}. [[${ttMarker}]]. `);
+        }
+        state.insertMarker = true;
+        state.changed = true;
+        state.turnTimeModifiedByCommand = true;
+        setSleepCooldown({hours: 8});
+      } else if (command === 'settime') {
         let dateStr = parts[1];
         let timeStr = parts.slice(2).join(' ');
         if (dateStr) {
