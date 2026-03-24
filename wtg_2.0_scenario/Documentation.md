@@ -226,7 +226,7 @@ This is a combined version of WTG 2.0 (Normal Mode) and WTG 2.0 Lightweight that
 ### Initial Setup Prompt
 When starting a new adventure, users will see:
 ```
-Use [settime 06/15/2023 8:00 AM AD] to set a custom starting date, era, and time. For BC dates, use [settime 03/15/44 9:00 AM BC]. If you leave the era off, [settime 06/15/2023 8:00 AM] defaults to AD. Years can be 1-6 digits (for example 7 or 44).
+Enter these commands as a story action. Use [settime MM/DD/YYYY H:MM AM/PM AD] to set a custom starting date, era, and time. Example: [settime 06/15/2023 8:00 AM AD]. For BC dates, use [settime 03/15/44 9:00 AM BC]. If you leave the era off, for example [settime 06/15/2023 8:00 AM], it defaults to AD. Years can be 1-6 digits (for example 7 or 44).
 
 To enable all of the features, use the command [normal]. You can go back to lightweight mode by using the command [light].
 

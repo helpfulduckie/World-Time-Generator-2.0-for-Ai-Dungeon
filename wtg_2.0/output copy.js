@@ -173,7 +173,7 @@ const modifier = (text) => {
   // If settime has NOT been initialized and we're at the start, inject the prompt
   if (!hasSettimeBeenInitialized() && state.startingDate === '01/01/1900' && state.startingTime === 'Unknown') {
     state.initialMessageShown = true;
-    modifiedText = ' Use [settime 06/15/2023 8:00 AM AD] to set a custom starting date, era, and time. For BC dates, use something like [settime 03/15/44 9:00 AM BC]. If you leave the era off, [settime 06/15/2023 8:00 AM] defaults to AD. Years can be 1-6 digits (for example 7 or 44).\n\nThis is the FULL version with automatic character and location detection. Format names as (CharacterName) and locations as ((LocationName)) to generate storycards.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)';
+    modifiedText = ' Enter these commands as a story action. Use [settime MM/DD/YYYY H:MM AM/PM AD] to set a custom starting date, era, and time. Example: [settime 06/15/2023 8:00 AM AD]. For BC dates, use something like [settime 03/15/44 9:00 AM BC]. If you leave the era off, for example [settime 06/15/2023 8:00 AM], it defaults to AD. Years can be 1-6 digits (for example 7 or 44).\n\nThis is the FULL version with automatic character and location detection. Format names as (CharacterName) and locations as ((LocationName)) to generate storycards.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)';
     return {text: ensureLeadingSpace(modifiedText)};
   }
 
