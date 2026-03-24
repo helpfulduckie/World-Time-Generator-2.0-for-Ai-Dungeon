@@ -15,9 +15,19 @@ const modifier = (text) => {
 
   ensureWTGEras();
 
+  if (state.pendingTimeCommandText) {
+    const timeText = ensureLeadingSpace(state.pendingTimeCommandText);
+    delete state.pendingTimeCommandText;
+    delete state.timeCommandUsed;
+    return { text: timeText };
+  }
+
   if (state.timeCommandUsed) {
     delete state.timeCommandUsed;
-    return { text: '' };
+    const ttMarker = formatTurnTime(state.turnTime);
+    return {
+      text: ensureLeadingSpace(`[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`)
+    };
   }
 
   // Initialize date/time state if not present (mirrors input.js initialization)
@@ -64,12 +74,15 @@ const modifier = (text) => {
       getCooldownCard();
       getWTGCommandsCard();
     } else {
-      // Fall back: Scan storycards for [settime] commands (limited for performance)
-      const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
-      for (let i = 0; i < maxCards; i++) {
+      // Fall back: Scan all storycards for [settime] commands at startup.
+      for (let i = 0; i < storyCards.length; i++) {
         const card = storyCards[i];
-        if (card && card.entry) {
-          const settimeMatch = card.entry.match(/\[settime\s+([^\]]+?)\]/i);
+        if (!card) continue;
+
+        const cardContent = card.entry || card.value || '';
+        const contentField = card.entry ? 'entry' : (card.value ? 'value' : null);
+        if (cardContent) {
+          const settimeMatch = cardContent.match(/\[settime\s+([^\]]+?)\]/i);
           if (settimeMatch) {
             const settimeArgs = settimeMatch[1].trim().split(/\s+/);
             const dateStr = settimeArgs[0];
@@ -98,7 +111,10 @@ const modifier = (text) => {
               getWTGCommandsCard();
 
               // Remove the [settime] command from the storycard
-              card.entry = card.entry.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+              const updatedContent = cardContent.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+              if (contentField) {
+                card[contentField] = updatedContent;
+              }
 
               // Skip the opening prompt and let AI respond
               // Don't return here, just continue to normal processing

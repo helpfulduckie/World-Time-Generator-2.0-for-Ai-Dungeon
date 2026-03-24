@@ -179,10 +179,12 @@ const modifier = (text) => {
             } else {
               const unit = parts[2] ? parts[2].toLowerCase() : 'hours';
               let add = {};
-              if (unit.startsWith('y')) {
-                add.years = amount;
-              } else if (unit.startsWith('m')) {
+              if (unit.startsWith('min')) {
+                add.minutes = amount;
+              } else if (unit === 'm' || unit.startsWith('mon')) {
                 add.months = amount;
+              } else if (unit.startsWith('y')) {
+                add.years = amount;
               } else if (unit.startsWith('d')) {
                 add.days = amount;
               } else {
@@ -203,10 +205,11 @@ const modifier = (text) => {
           }
         } else if (command === 'time') {
           const ttMarker = formatTurnTime(state.turnTime);
-          wtgMessages.push(`[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`);
+          const timeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
+          wtgMessages.push(timeMessage);
+          state.pendingWTGOutputMessage = timeMessage;
           state.insertMarker = false;
           state.changed = true;
-          state.timeCommandUsed = true;
           modifiedText = '';
         } else if (command === 'reset') {
           let newDate = getCurrentDateFromHistory('', true);

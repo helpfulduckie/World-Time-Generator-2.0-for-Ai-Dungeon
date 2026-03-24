@@ -6,6 +6,9 @@
 // WTG runs first for time consistency, then AutoCards processes the result
 
 const modifier = (text) => {
+  const WTG_COMMAND_REGEX = /\[([^\]]+)\]/g;
+  const WTG_COMMANDS = new Set(['settime', 'advance', 'sleep', 'reset', 'time']);
+
   // ============ WTG PROCESSING FIRST ============
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
@@ -83,9 +86,11 @@ const modifier = (text) => {
 
   state.changed = state.changed || false;
   state.insertMarker = false;
+  delete state.pendingTimeCommandText;
 
   let modifiedText = text;
   let messages = [];
+  let sawTimeCommand = false;
 
   // Check if user action is [sleep] command to trigger sleep
   if (text.trim().toLowerCase() === '[sleep]') {
@@ -113,20 +118,28 @@ const modifier = (text) => {
       const ttMarker = formatTurnTime(state.turnTime);
       messages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${getCurrentDateDisplay()} at ${state.currentTime}. [[${ttMarker}]]. `);
     }
-      state.insertMarker = true;
-      state.changed = true;
-      // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
-      state.turnTimeModifiedByCommand = true;
-      setSleepCooldown({hours: 8});
-      modifiedText = '';
-    }
-    // Handle bracketed commands
-    else {
-    let trimmedText = text.trim();
-    if (trimmedText.match(/^\[(.+?)\]$/)) {
-      const commandStr = trimmedText.match(/^\[(.+?)\]$/)[1].trim().toLowerCase();
-      const parts = commandStr.split(/\s+/);
-      const command = parts[0];
+    state.insertMarker = true;
+    state.changed = true;
+    // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
+    state.turnTimeModifiedByCommand = true;
+    setSleepCooldown({hours: 8});
+    modifiedText = '';
+  } else {
+    const commandMatches = [];
+    modifiedText = text.replace(WTG_COMMAND_REGEX, (match, commandBody) => {
+      const command = commandBody.trim().split(/\s+/)[0].toLowerCase();
+      if (WTG_COMMANDS.has(command)) {
+        commandMatches.push(commandBody.trim());
+        return ' ';
+      }
+      return match;
+    });
+
+    modifiedText = modifiedText.replace(/\s{2,}/g, ' ').trim();
+
+    for (const commandEntry of commandMatches) {
+      const parts = commandEntry.split(/\s+/);
+      const command = parts[0].toLowerCase();
 
       if (command === 'settime') {
         let dateStr = parts[1];
@@ -176,6 +189,8 @@ const modifier = (text) => {
           let add = {};
           if (unit.startsWith('y')) {
             add.years = amount;
+          } else if (unit.startsWith('min')) {
+            add.minutes = amount;
           } else if (unit.startsWith('m')) {
             add.months = amount;
           } else if (unit.startsWith('d')) {
@@ -197,12 +212,9 @@ const modifier = (text) => {
           setAdvanceCooldown({minutes: 5});
         }
       } else if (command === 'time') {
-        const ttMarker = formatTurnTime(state.turnTime);
-        messages.push(`[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`);
+        sawTimeCommand = true;
         state.insertMarker = false;
         state.changed = true;
-        state.timeCommandUsed = true;
-        modifiedText = '';
       } else if (command === 'reset') {
         let newDate = getCurrentDateFromHistory('', true);
         let newTime = getCurrentTimeFromHistory('', true);
@@ -238,7 +250,6 @@ const modifier = (text) => {
       } else {
         messages.push('[Invalid command. Available: settime, advance, time, reset, sleep.]');
       }
-      modifiedText = '';
     }
   }
 
@@ -246,6 +257,12 @@ const modifier = (text) => {
   if (messages.length > 0) {
     // Always add a newline after system messages to ensure proper spacing before AI response
     modifiedText = messages.join('\n') + '\n' + (modifiedText || '');
+  }
+
+  if (sawTimeCommand) {
+    const ttMarker = formatTurnTime(state.turnTime);
+    state.pendingTimeCommandText = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
+    state.timeCommandUsed = true;
   }
 
   // ============ AUTOCARDS PROCESSING SECOND ============

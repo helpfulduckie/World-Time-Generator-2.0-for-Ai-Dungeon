@@ -12,8 +12,17 @@ const modifier = (text) => {
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
   if (state.timeCommandUsed) {
+    const pendingTimeOutput = state.pendingTimeCommandOutput || `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${formatTurnTime(state.turnTime)}]]`;
     delete state.timeCommandUsed;
-    return { text: '' };
+    delete state.pendingTimeCommandOutput;
+    return { text: ensureLeadingSpace(pendingTimeOutput) };
+  }
+
+  if (state.pendingTimeCommandOutput) {
+    const pendingTimeOutput = state.pendingTimeCommandOutput;
+    delete state.timeCommandUsed;
+    delete state.pendingTimeCommandOutput;
+    return { text: ensureLeadingSpace(pendingTimeOutput) };
   }
 
   // Initialize mode to normal (full version always uses normal mode)
@@ -81,11 +90,29 @@ const modifier = (text) => {
       }
     } else {
       // Fall back: Scan storycards for [settime] commands (limited for performance)
-      const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
-      for (let i = 0; i < maxCards; i++) {
+      const getStoryCardText = (card) => {
+        if (!card) return '';
+        if (typeof card.entry === 'string' && card.entry) return card.entry;
+        if (typeof card.value === 'string' && card.value) return card.value;
+        return '';
+      };
+
+      const setStoryCardText = (card, value) => {
+        if (!card) return;
+        if (typeof card.entry === 'string') {
+          card.entry = value;
+        } else if (typeof card.value === 'string') {
+          card.value = value;
+        } else {
+          card.entry = value;
+        }
+      };
+
+      for (let i = 0; i < storyCards.length; i++) {
         const card = storyCards[i];
-        if (card && card.entry) {
-          const settimeMatch = card.entry.match(/\[settime\s+([^\]]+?)\]/i);
+        const cardText = getStoryCardText(card);
+        if (cardText) {
+          const settimeMatch = cardText.match(/\[settime\s+([^\]]+?)\]/i);
           if (settimeMatch) {
             const settimeArgs = settimeMatch[1].trim().split(/\s+/);
             const dateStr = settimeArgs[0];
@@ -120,7 +147,7 @@ const modifier = (text) => {
               }
 
               // Remove the [settime] command from the storycard
-              card.entry = card.entry.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+              setStoryCardText(card, cardText.replace(/\[settime\s+[^\]]+?\]/i, '').trim());
 
               // Skip the opening prompt and let AI respond
               // Don't return here, just continue to normal processing

@@ -11,9 +11,10 @@ const modifier = (text) => {
   // ========== WTG OUTPUT PROCESSING ==========
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
-  if (state.timeCommandUsed) {
-    delete state.timeCommandUsed;
-    return { text: '' };
+  if (state.pendingWTGOutputMessage) {
+    const pendingMessage = state.pendingWTGOutputMessage;
+    delete state.pendingWTGOutputMessage;
+    return { text: ensureLeadingSpace(pendingMessage) };
   }
 
   // Initialize mode if not set (default to lightweight)
@@ -78,11 +79,18 @@ const modifier = (text) => {
       }
     } else {
       // Fall back: Check for [settime] command in storycards at scenario start
-      const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
+      const maxCards = storyCards.length;
       for (let i = 0; i < maxCards; i++) {
         const card = storyCards[i];
-        if (card && card.entry) {
-          const settimeMatch = card.entry.match(/\[settime\s+([^\]]+?)\]/i);
+        if (card) {
+          const content = typeof card.entry === 'string' && card.entry.length > 0
+            ? card.entry
+            : (typeof card.value === 'string' && card.value.length > 0 ? card.value : '');
+          if (!content) {
+            continue;
+          }
+
+          const settimeMatch = content.match(/\[settime\s+([^\]]+?)\]/i);
           if (settimeMatch) {
             const settimeArgs = settimeMatch[1].trim().split(/\s+/);
             const dateStr = settimeArgs[0];
@@ -111,7 +119,12 @@ const modifier = (text) => {
                 getWTGDataCard();
               }
 
-              card.entry = card.entry.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+              const updatedContent = content.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+              if (typeof card.entry === 'string' && card.entry.length > 0) {
+                card.entry = updatedContent;
+              } else if (typeof card.value === 'string' && card.value.length > 0) {
+                card.value = updatedContent;
+              }
               break;
             }
           }
