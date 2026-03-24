@@ -87,6 +87,7 @@ const modifier = (text) => {
 
   let modifiedText = text;
   let messages = [];
+  let terminalTimeMessage = null;
   const WTG_COMMAND_NAMES = new Set(['settime', 'advance', 'sleep', 'reset', 'time']);
   const bracketCommandRegex = /\[([^\]]+)\]/g;
   const commandQueue = [];
@@ -223,8 +224,10 @@ const modifier = (text) => {
       }
     } else if (command === 'time') {
       const ttMarker = formatTurnTime(state.turnTime);
-      state.pendingTimeResponse = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
+      terminalTimeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
+      state.pendingTimeResponse = terminalTimeMessage;
       state.timeCommandUsed = true;
+      break;
     } else if (command === 'reset') {
       let newDate = getCurrentDateFromHistory('', true);
       let newTime = getCurrentTimeFromHistory('', true);
@@ -258,6 +261,11 @@ const modifier = (text) => {
         messages.push(`[No date or time mentions found in history.]`);
       }
     }
+  }
+
+  if (terminalTimeMessage) {
+    messages = [terminalTimeMessage];
+    modifiedText = '';
   }
 
   // Add messages to modified text

@@ -100,6 +100,7 @@ const modifier = (text) => {
 
   let modifiedText = text;
   let messages = [];
+  let terminalTimeMessage = null;
   const commandRegex = /\[(\s*(?:settime|advance|sleep|reset|time)\b[^\]]*)\]/gi;
   const commandMatches = [...modifiedText.matchAll(commandRegex)];
 
@@ -216,12 +217,12 @@ const modifier = (text) => {
       }
     } else if (command === 'time') {
       const ttMarker = formatTurnTime(state.turnTime);
-      const timeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
-      queueCommandMessage(timeMessage);
+      terminalTimeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
       state.insertMarker = false;
       state.changed = true;
       state.timeCommandUsed = true;
-      state.pendingTimeCommandOutput = timeMessage;
+      state.pendingTimeCommandOutput = terminalTimeMessage;
+      break;
     } else if (command === 'reset') {
       let newDate = getCurrentDateFromHistory('', true);
       let newTime = getCurrentTimeFromHistory('', true);
@@ -254,6 +255,11 @@ const modifier = (text) => {
     } else if (command) {
       queueCommandMessage('[Invalid command. Available: settime, advance, time, reset, sleep.]');
     }
+  }
+
+  if (terminalTimeMessage) {
+    messages = [terminalTimeMessage];
+    modifiedText = '';
   }
 
   // Add messages to modified text

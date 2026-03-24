@@ -108,6 +108,7 @@ const modifier = (text) => {
 
   let modifiedText = text;
   let messages = [];
+  let terminalTimeMessage = null;
 
   const commandRegex = /\[([^\]]+)\]/g;
   const allowedCommands = new Set(['light', 'normal', 'settime', 'advance', 'sleep', 'reset', 'time']);
@@ -183,7 +184,7 @@ const modifier = (text) => {
         } else {
           const amount = parseInt(parts[1], 10);
           const unit = parts[2] ? parts[2].toLowerCase() : 'hours';
-          if (isNaN(amount) || amount < 0) {
+          if (isNaN(amount) || amount <= 0) {
             messages.push('[Invalid advance command. Use: [advance N hours/days/months/years/minutes]. Example: [advance 2 hours]]');
           } else {
             let add = {};
@@ -278,11 +279,12 @@ const modifier = (text) => {
         }
       } else if (command === 'time') {
         const ttMarker = formatTurnTime(state.turnTime);
-        const timeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
-        messages.push(timeMessage);
+        terminalTimeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
         state.insertMarker = false;
         state.changed = true;
-        state.pendingTimeCommandOutput = timeMessage;
+        state.pendingTimeCommandOutput = terminalTimeMessage;
+        lastIndex = text.length;
+        break;
       } else {
         messages.push('[Invalid command. Available: settime, advance, time, reset, sleep, light, normal.]');
       }
@@ -292,6 +294,11 @@ const modifier = (text) => {
 
     rebuiltText += text.slice(lastIndex);
     modifiedText = rebuiltText;
+  }
+
+  if (terminalTimeMessage) {
+    messages = [terminalTimeMessage];
+    modifiedText = '';
   }
 
   // Add messages to modified text

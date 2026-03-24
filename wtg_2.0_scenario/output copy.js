@@ -97,62 +97,59 @@ const modifier = (text) => {
     }
   }
 
-  // Fallback: Check for [settime] command in storycards at scenario start
-  if (state.startingDate === '01/01/1900' && !state.settimeInitialized && info.actionCount <= 1) {
+  // Fallback: Check for [settime] command in storycards at startup
+  if (state.startingDate === '01/01/1900' && !state.settimeInitialized) {
     // Scan all storycards for a startup [settime] command.
-    for (const card of storyCards) {
+    storycardLoop: for (const card of storyCards) {
       if (!card) continue;
 
-      const entryText = typeof card.entry === 'string' ? card.entry : '';
-      const valueText = typeof card.value === 'string' ? card.value : '';
-      const cardText = entryText || valueText;
-      if (!cardText) continue;
+      for (const field of ['entry', 'value']) {
+        const cardText = typeof card[field] === 'string' ? card[field] : '';
+        if (!cardText) continue;
 
-      const settimeMatch = cardText.match(/\[settime\s+([^\]]+?)\]/i);
-      if (!settimeMatch) continue;
+        const settimeMatch = cardText.match(/\[settime\s+([^\]]+?)\]/i);
+        if (!settimeMatch) continue;
 
-      const settimeArgs = settimeMatch[1].trim().split(/\s+/);
-      const dateStr = settimeArgs[0];
-      const timeStr = settimeArgs.slice(1).join(' ');
-      const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
+        const settimeArgs = settimeMatch[1].trim().split(/\s+/);
+        const dateStr = settimeArgs[0];
+        const timeStr = settimeArgs.slice(1).join(' ');
+        const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
 
-      if (!parsedSettime) continue;
+        if (!parsedSettime) continue;
 
-      // Set the starting date and time
-      state.startingDate = parsedSettime.startingDate;
-      state.startingEra = parsedSettime.startingEra;
-      state.startingTime = parsedSettime.startingTime || state.startingTime;
-      // Don't reset turnTime if it was already set by a command in input.js
-      if (!state.turnTimeModifiedByCommand) {
-        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+        // Set the starting date and time
+        state.startingDate = parsedSettime.startingDate;
+        state.startingEra = parsedSettime.startingEra;
+        state.startingTime = parsedSettime.startingTime || state.startingTime;
+        // Don't reset turnTime if it was already set by a command in input.js
+        if (!state.turnTimeModifiedByCommand) {
+          state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+        }
+        const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+        state.currentDate = currentDate;
+        state.currentEra = currentEra;
+        state.currentTime = currentTime;
+        state.changed = true;
+
+        // Mark settime as initialized since we auto-detected it
+        markSettimeAsInitialized();
+
+        // Initialize required system storycards
+        updateDateTimeCard();
+        getWTGSettingsCard();
+        getCooldownCard();
+        getWTGCommandsCard();
+        if (!isLightweightMode()) {
+          getWTGDataCard();
+        }
+
+        // Remove the [settime] command from the matched field.
+        card[field] = cardText.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+
+        // Skip the opening prompt and let AI respond
+        // Don't return here, just continue to normal processing
+        break storycardLoop;
       }
-      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
-      state.currentDate = currentDate;
-      state.currentEra = currentEra;
-      state.currentTime = currentTime;
-      state.changed = true;
-
-      // Mark settime as initialized since we auto-detected it
-      markSettimeAsInitialized();
-
-      // Initialize required system storycards
-      updateDateTimeCard();
-      getWTGSettingsCard();
-      getCooldownCard();
-      getWTGCommandsCard();
-      if (!isLightweightMode()) {
-        getWTGDataCard();
-      }
-
-      // Remove the [settime] command from whichever field held it.
-      const sourceField = entryText && entryText.match(/\[settime\s+([^\]]+?)\]/i) ? 'entry' : 'value';
-      if (typeof card[sourceField] === 'string') {
-        card[sourceField] = card[sourceField].replace(/\[settime\s+[^\]]+?\]/i, '').trim();
-      }
-
-      // Skip the opening prompt and let AI respond
-      // Don't return here, just continue to normal processing
-      break;
     }
   }
 

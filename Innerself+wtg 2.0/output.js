@@ -79,54 +79,46 @@ const modifier = (text) => {
       }
     } else {
       // Fall back: Check for [settime] command in storycards at scenario start
-      const maxCards = storyCards.length;
-      for (let i = 0; i < maxCards; i++) {
+      storycardLoop: for (let i = 0; i < storyCards.length; i++) {
         const card = storyCards[i];
-        if (card) {
-          const content = typeof card.entry === 'string' && card.entry.length > 0
-            ? card.entry
-            : (typeof card.value === 'string' && card.value.length > 0 ? card.value : '');
-          if (!content) {
-            continue;
-          }
+        if (!card) continue;
+
+        for (const field of ['entry', 'value']) {
+          const content = typeof card[field] === 'string' ? card[field] : '';
+          if (!content) continue;
 
           const settimeMatch = content.match(/\[settime\s+([^\]]+?)\]/i);
-          if (settimeMatch) {
-            const settimeArgs = settimeMatch[1].trim().split(/\s+/);
-            const dateStr = settimeArgs[0];
-            const timeStr = settimeArgs.slice(1).join(' ');
-            const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
+          if (!settimeMatch) continue;
 
-            if (parsedSettime) {
-              state.startingDate = parsedSettime.startingDate;
-              state.startingEra = parsedSettime.startingEra;
-              state.startingTime = parsedSettime.startingTime || state.startingTime;
-              if (!state.turnTimeModifiedByCommand) {
-                state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-              }
-              const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
-              state.currentDate = currentDate;
-              state.currentEra = currentEra;
-              state.currentTime = currentTime;
-              state.changed = true;
+          const settimeArgs = settimeMatch[1].trim().split(/\s+/);
+          const dateStr = settimeArgs[0];
+          const timeStr = settimeArgs.slice(1).join(' ');
+          const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
 
-              markSettimeAsInitialized();
-              updateDateTimeCard();
-              getWTGSettingsCard();
-              getCooldownCard();
-              getWTGCommandsCard();
-              if (!isLightweightMode()) {
-                getWTGDataCard();
-              }
-
-              const updatedContent = content.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
-              if (typeof card.entry === 'string' && card.entry.length > 0) {
-                card.entry = updatedContent;
-              } else if (typeof card.value === 'string' && card.value.length > 0) {
-                card.value = updatedContent;
-              }
-              break;
+          if (parsedSettime) {
+            state.startingDate = parsedSettime.startingDate;
+            state.startingEra = parsedSettime.startingEra;
+            state.startingTime = parsedSettime.startingTime || state.startingTime;
+            if (!state.turnTimeModifiedByCommand) {
+              state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
             }
+            const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+            state.currentDate = currentDate;
+            state.currentEra = currentEra;
+            state.currentTime = currentTime;
+            state.changed = true;
+
+            markSettimeAsInitialized();
+            updateDateTimeCard();
+            getWTGSettingsCard();
+            getCooldownCard();
+            getWTGCommandsCard();
+            if (!isLightweightMode()) {
+              getWTGDataCard();
+            }
+
+            card[field] = content.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+            break storycardLoop;
           }
         }
       }

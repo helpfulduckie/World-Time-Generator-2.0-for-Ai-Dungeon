@@ -75,51 +75,49 @@ const modifier = (text) => {
       getWTGCommandsCard();
     } else {
       // Fall back: Scan all storycards for [settime] commands at startup.
-      for (let i = 0; i < storyCards.length; i++) {
+      storycardLoop: for (let i = 0; i < storyCards.length; i++) {
         const card = storyCards[i];
         if (!card) continue;
 
-        const cardContent = card.entry || card.value || '';
-        const contentField = card.entry ? 'entry' : (card.value ? 'value' : null);
-        if (cardContent) {
+        for (const field of ['entry', 'value']) {
+          const cardContent = typeof card[field] === 'string' ? card[field] : '';
+          if (!cardContent) continue;
+
           const settimeMatch = cardContent.match(/\[settime\s+([^\]]+?)\]/i);
-          if (settimeMatch) {
-            const settimeArgs = settimeMatch[1].trim().split(/\s+/);
-            const dateStr = settimeArgs[0];
-            const timeStr = settimeArgs.slice(1).join(' ');
-            const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
+          if (!settimeMatch) continue;
 
-            if (parsedSettime) {
-              // Set the starting date and time
-              state.startingDate = parsedSettime.startingDate;
-              state.startingEra = parsedSettime.startingEra;
-              state.startingTime = parsedSettime.startingTime || state.startingTime;
-              if (!state.turnTimeModifiedByCommand) {
-                state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-              }
-              const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
-              state.currentDate = currentDate;
-              state.currentEra = currentEra;
-              state.currentTime = currentTime;
-              state.changed = true;
-              state.settimeInitialized = true;
+          const settimeArgs = settimeMatch[1].trim().split(/\s+/);
+          const dateStr = settimeArgs[0];
+          const timeStr = settimeArgs.slice(1).join(' ');
+          const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
 
-              // Initialize required system storycards
-              updateDateTimeCard();
-              getWTGSettingsCard();
-              getCooldownCard();
-              getWTGCommandsCard();
-
-              // Remove the [settime] command from the storycard
-              const updatedContent = cardContent.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
-              if (contentField) {
-                card[contentField] = updatedContent;
-              }
-
-              // Skip the opening prompt and let AI respond
-              // Don't return here, just continue to normal processing
-              break;
+          if (parsedSettime) {
+            // Set the starting date and time
+            state.startingDate = parsedSettime.startingDate;
+            state.startingEra = parsedSettime.startingEra;
+            state.startingTime = parsedSettime.startingTime || state.startingTime;
+            if (!state.turnTimeModifiedByCommand) {
+              state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
             }
+            const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+            state.currentDate = currentDate;
+            state.currentEra = currentEra;
+            state.currentTime = currentTime;
+            state.changed = true;
+            state.settimeInitialized = true;
+
+            // Initialize required system storycards
+            updateDateTimeCard();
+            getWTGSettingsCard();
+            getCooldownCard();
+            getWTGCommandsCard();
+
+            // Remove the [settime] command from the matched storycard field.
+            card[field] = cardContent.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+
+            // Skip the opening prompt and let AI respond
+            // Don't return here, just continue to normal processing
+            break storycardLoop;
           }
         }
       }

@@ -90,7 +90,7 @@ const modifier = (text) => {
 
   let modifiedText = text;
   let messages = [];
-  let sawTimeCommand = false;
+  let terminalTimeMessage = null;
 
   // Check if user action is [sleep] command to trigger sleep
   if (text.trim().toLowerCase() === '[sleep]') {
@@ -213,6 +213,10 @@ const modifier = (text) => {
           messages.push(`[Time advancement not applied as current time is descriptive (${state.startingTime}). Use [settime] to set a numeric time if needed.]`);
         } else {
           const amount = parseInt(parts[1], 10);
+          if (isNaN(amount) || amount <= 0) {
+            messages.push('[Invalid advance command. Use: [advance N hours/days/months/years/minutes]. Example: [advance 2 hours]]');
+            continue;
+          }
           const unit = parts[2] ? parts[2].toLowerCase() : 'hours';
           let add = {};
           if (unit.startsWith('y')) {
@@ -240,9 +244,11 @@ const modifier = (text) => {
           setAdvanceCooldown({minutes: 5});
         }
       } else if (command === 'time') {
-        sawTimeCommand = true;
+        const ttMarker = formatTurnTime(state.turnTime);
+        terminalTimeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
         state.insertMarker = false;
         state.changed = true;
+        break;
       } else if (command === 'reset') {
         let newDate = getCurrentDateFromHistory('', true);
         let newTime = getCurrentTimeFromHistory('', true);
@@ -281,16 +287,17 @@ const modifier = (text) => {
     }
   }
 
+  if (terminalTimeMessage) {
+    messages = [terminalTimeMessage];
+    modifiedText = '';
+    state.pendingTimeCommandText = terminalTimeMessage;
+    state.timeCommandUsed = true;
+  }
+
   // Add messages to modified text with proper spacing
   if (messages.length > 0) {
     // Always add a newline after system messages to ensure proper spacing before AI response
     modifiedText = messages.join('\n') + '\n' + (modifiedText || '');
-  }
-
-  if (sawTimeCommand) {
-    const ttMarker = formatTurnTime(state.turnTime);
-    state.pendingTimeCommandText = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
-    state.timeCommandUsed = true;
   }
 
   // ============ AUTOCARDS PROCESSING SECOND ============

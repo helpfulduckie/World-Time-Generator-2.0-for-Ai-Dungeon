@@ -97,6 +97,7 @@ const modifier = (text) => {
     state.insertMarker = false;
 
     let wtgMessages = [];
+    let terminalTimeMessage = null;
 
     if (commandQueue.length > 0) {
       modifiedText = modifiedText.replace(bracketCommandRegex, ' ').replace(/\s{2,}/g, ' ').trim();
@@ -205,12 +206,11 @@ const modifier = (text) => {
           }
         } else if (command === 'time') {
           const ttMarker = formatTurnTime(state.turnTime);
-          const timeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
-          wtgMessages.push(timeMessage);
-          state.pendingWTGOutputMessage = timeMessage;
+          terminalTimeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
+          state.pendingWTGOutputMessage = terminalTimeMessage;
           state.insertMarker = false;
           state.changed = true;
-          modifiedText = '';
+          break;
         } else if (command === 'reset') {
           let newDate = getCurrentDateFromHistory('', true);
           let newTime = getCurrentTimeFromHistory('', true);
@@ -240,6 +240,11 @@ const modifier = (text) => {
           }
         }
       }
+    }
+
+    if (terminalTimeMessage) {
+      wtgMessages = [terminalTimeMessage];
+      modifiedText = '';
     }
 
     // Add WTG messages to text
