@@ -13,11 +13,30 @@ const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
+  ensureWTGEras();
+
+  if (state.pendingTimeCommandText) {
+    const timeText = ensureLeadingSpace(state.pendingTimeCommandText);
+    delete state.pendingTimeCommandText;
+    delete state.timeCommandUsed;
+    return { text: timeText };
+  }
+
+  if (state.timeCommandUsed) {
+    delete state.timeCommandUsed;
+    const ttMarker = formatTurnTime(state.turnTime);
+    return {
+      text: ensureLeadingSpace(`[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`)
+    };
+  }
+
   // Initialize date/time state if not present (mirrors input.js initialization)
   if (state.startingDate === undefined) {
     state.startingDate = '01/01/1900';
     state.startingTime = 'Unknown';
+    state.startingEra = DEFAULT_WTG_ERA;
     state.currentDate = '01/01/1900';
+    state.currentEra = DEFAULT_WTG_ERA;
     state.currentTime = 'Unknown';
     state.settimeInitialized = false;
   }
@@ -37,10 +56,14 @@ const modifier = (text) => {
     if (timeConfig && timeConfig.initialized) {
       // Use config card values directly - skip full storycard scan
       state.startingDate = timeConfig.startingDate;
+      state.startingEra = timeConfig.startingEra;
       state.startingTime = timeConfig.startingTime;
-      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      if (!state.turnTimeModifiedByCommand) {
+        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+      }
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       state.changed = true;
       state.settimeInitialized = true;
@@ -51,53 +74,50 @@ const modifier = (text) => {
       getCooldownCard();
       getWTGCommandsCard();
     } else {
-      // Fall back: Scan storycards for [settime] commands (limited for performance)
-      const maxCards = Math.min(storyCards.length, MAX_STORYCARDS_TO_PROCESS);
-      for (let i = 0; i < maxCards; i++) {
+      // Fall back: Scan all storycards for [settime] commands at startup.
+      storycardLoop: for (let i = 0; i < storyCards.length; i++) {
         const card = storyCards[i];
-        if (card && card.entry) {
-          // Match [settime date time] format - handle both "mm/dd/yyyy" and variations
-          const settimeMatch = card.entry.match(/\[settime\s+(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\s+(.+?)\]/i);
-          if (settimeMatch) {
-            let dateStr = settimeMatch[1];
-            let timeStr = settimeMatch[2].trim();
+        if (!card) continue;
 
-            // Normalize date separators
-            dateStr = dateStr.replace(/[.-]/g, '/');
-            let [part1, part2, year] = dateStr.split('/').map(Number);
-            if (year < 100) year += 2000;
-            let month = part1;
-            let day = part2;
-            if (month > 12 && day <= 12) [month, day] = [day, part1];
+        for (const field of ['entry', 'value']) {
+          const cardContent = typeof card[field] === 'string' ? card[field] : '';
+          if (!cardContent) continue;
 
-            if (isValidDate(month, day, year)) {
-              // Set the starting date and time
-              state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
-              if (timeStr) {
-                state.startingTime = normalizeTime(timeStr);
-              } else {
-                state.startingTime = 'Unknown';
-              }
+          const settimeMatch = cardContent.match(/\[settime\s+([^\]]+?)\]/i);
+          if (!settimeMatch) continue;
+
+          const settimeArgs = settimeMatch[1].trim().split(/\s+/);
+          const dateStr = settimeArgs[0];
+          const timeStr = settimeArgs.slice(1).join(' ');
+          const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
+
+          if (parsedSettime) {
+            // Set the starting date and time
+            state.startingDate = parsedSettime.startingDate;
+            state.startingEra = parsedSettime.startingEra;
+            state.startingTime = parsedSettime.startingTime || state.startingTime;
+            if (!state.turnTimeModifiedByCommand) {
               state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-              const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
-              state.currentDate = currentDate;
-              state.currentTime = currentTime;
-              state.changed = true;
-              state.settimeInitialized = true;
-
-              // Initialize required system storycards
-              updateDateTimeCard();
-              getWTGSettingsCard();
-              getCooldownCard();
-              getWTGCommandsCard();
-
-              // Remove the [settime] command from the storycard
-              card.entry = card.entry.replace(/\[settime\s+\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}\s+.+?\]/i, '').trim();
-
-              // Skip the opening prompt and let AI respond
-              // Don't return here, just continue to normal processing
-              break;
             }
+            const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+            state.currentDate = currentDate;
+            state.currentEra = currentEra;
+            state.currentTime = currentTime;
+            state.changed = true;
+            state.settimeInitialized = true;
+
+            // Initialize required system storycards
+            updateDateTimeCard();
+            getWTGSettingsCard();
+            getCooldownCard();
+            getWTGCommandsCard();
+
+            // Remove the [settime] command from the matched storycard field.
+            card[field] = cardContent.replace(/\[settime\s+[^\]]+?\]/i, '').trim();
+
+            // Skip the opening prompt and let AI respond
+            // Don't return here, just continue to normal processing
+            break storycardLoop;
           }
         }
       }
@@ -113,10 +133,14 @@ const modifier = (text) => {
     const year = now.getFullYear();
 
     state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+    state.startingEra = DEFAULT_WTG_ERA;
     state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
-    state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-    const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+    if (!state.turnTimeModifiedByCommand) {
+        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+    }
+    const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
     state.currentDate = currentDate;
+    state.currentEra = currentEra;
     state.currentTime = currentTime;
     markSettimeAsInitialized();
     updateDateTimeCard();
@@ -127,7 +151,7 @@ const modifier = (text) => {
 
   if (state.startingDate === '01/01/1900' && state.startingTime === 'Unknown') {
     state.initialMessageShown = true;
-    modifiedText = ' Use [settime mm/dd/yyyy time] to set a custom starting date and time, or just take any action to auto-initialize with the current real-world time.\n\nThis version combines WTG time tracking with AutoCards for automatic storycard generation.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)';
+    modifiedText = ' Enter these commands as a story action. Use [settime MM/DD/YYYY H:MM AM/PM AD] to set a custom starting date, era, and time. Example: [settime 06/15/2023 8:00 AM AD]. For BC dates, use something like [settime 03/15/44 9:00 AM BC]. If you leave the era off, for example [settime 06/15/2023 8:00 AM], it defaults to AD. Years can be 1-6 digits (for example 7 or 44).\n\nThis version combines WTG time tracking with AutoCards for automatic storycard generation.\n\nTo report bugs, message me on discord: thedenial. (it has a period at the end of it)';
     return {text: ensureLeadingSpace(modifiedText)};
   }
 
@@ -199,8 +223,9 @@ const modifier = (text) => {
         // Apply the time jump if we have valid values
         if (days > 0 || hours > 0 || minutes > 0) {
           state.turnTime = addToTurnTime(state.turnTime, { days, hours, minutes });
-          const { currentDate, currentTime } = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+          const { currentDate, currentEra, currentTime } = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
           state.currentDate = currentDate;
+          state.currentEra = currentEra;
           state.currentTime = currentTime;
           state.changed = true;
           timeAdjustedByCommand = true;
@@ -264,8 +289,9 @@ const modifier = (text) => {
   // Update turn time based on character count if starting time is not descriptive and no command was processed
   if (!timeAdjustedByCommand && state.startingTime !== 'Unknown' && minutesToAdd > 0) {
     state.turnTime = addToTurnTime(state.turnTime, {minutes: minutesToAdd});
-    const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+    const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
     state.currentDate = currentDate;
+    state.currentEra = currentEra;
     state.currentTime = currentTime;
     state.changed = true;
   }
@@ -300,7 +326,7 @@ const modifier = (text) => {
 
       // Add timestamp only if card doesn't have one AND its keywords are mentioned in the text
       if (card.entry && !hasTimestamp(card) && isCardKeywordMentioned(card, combinedText)) {
-        addTimestampToCard(card, `${state.currentDate} ${state.currentTime}`);
+        addTimestampToCard(card, getCurrentTimestampDisplay());
       }
     }
   }
@@ -319,6 +345,9 @@ const modifier = (text) => {
 
   delete state.insertMarker;
 
+  // Clean up turnTimeModifiedByCommand flag (set in input.js, read in context.js and output.js)
+  delete state.turnTimeModifiedByCommand;
+
   // ============ AUTOCARDS PROCESSING SECOND ============
   modifiedText = AutoCards("output", modifiedText);
 
@@ -329,4 +358,3 @@ const modifier = (text) => {
 };
 
 modifier(text);
-

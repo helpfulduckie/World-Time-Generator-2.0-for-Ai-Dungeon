@@ -6,14 +6,14 @@
 
 const modifier = (text) => {
   // ========== WTG CONTEXT PROCESSING ==========
-  // Initialize WTG state
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+
+  ensureWTGEras();
 
   let modifiedText = text;
 
   // Check if WTG is disabled entirely
   if (!getWTGBooleanSetting("Disable WTG Entirely")) {
-    // Get turn data from WTG Data storycard
     const turnData = getTurnData();
 
     // Handle adventure erasing based on action matching
@@ -21,7 +21,7 @@ const modifier = (text) => {
       let previousAction = null;
       for (let i = history.length - 2; i >= 0; i--) {
         const action = history[i];
-        if (action.type === "do" || action.type === "say" || action.type === "story") {
+        if (action.type === 'do' || action.type === 'say' || action.type === 'story') {
           previousAction = action;
           break;
         }
@@ -46,11 +46,11 @@ const modifier = (text) => {
     let secondLastKeywords = [];
 
     if (currentTurnData.length >= 1) {
-      lastKeywords = extractKeywords(currentTurnData[currentTurnData.length - 1].actionText + " " + (currentTurnData[currentTurnData.length - 1].responseText || ''));
+      lastKeywords = extractKeywords(currentTurnData[currentTurnData.length - 1].actionText + ' ' + (currentTurnData[currentTurnData.length - 1].responseText || ''));
     }
 
     if (currentTurnData.length >= 2) {
-      secondLastKeywords = extractKeywords(currentTurnData[currentTurnData.length - 2].actionText + " " + (currentTurnData[currentTurnData.length - 2].responseText || ''));
+      secondLastKeywords = extractKeywords(currentTurnData[currentTurnData.length - 2].actionText + ' ' + (currentTurnData[currentTurnData.length - 2].responseText || ''));
     }
 
     const currentKeywords = extractKeywords(modifiedText);
@@ -69,7 +69,7 @@ const modifier = (text) => {
     let useLastTTDirectly = false;
     if (history.length > 0) {
       const lastActionText = history[history.length - 1].text;
-      if (lastActionText.match(/\[\[(\d{2}y\d{2}m\d{2}d\d{2}h\d{2}n\d{2}s)\]\]$/)) {
+      if (lastActionText.match(new RegExp(`\\[\\[(${WTG_TURN_TIME_PATTERN})\\]\\]$`))) {
         useLastTTDirectly = true;
       }
     }
@@ -81,8 +81,9 @@ const modifier = (text) => {
       // state.turnTime, currentDate, currentTime are already correct from input.js
     } else if (useLastTTDirectly) {
       state.turnTime = lastTT;
-      const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       state.changed = true;
     } else if (markerFound) {
@@ -101,10 +102,9 @@ const modifier = (text) => {
         state.turnTime = addToTurnTime(lastTT, {minutes: additionalMinutes});
         state.changed = true;
       }
-      // If additionalMinutes is 0, preserve existing state.turnTime
-      // Don't overwrite with potentially stale lastTT from WTG Data
-      const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
     } else {
       if (state.turnTime && state.startingTime !== 'Unknown') {
@@ -121,8 +121,9 @@ const modifier = (text) => {
 
         if (additionalMinutes > 0) {
           state.turnTime = addToTurnTime(state.turnTime, {minutes: additionalMinutes});
-          const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+          const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
           state.currentDate = currentDate;
+          state.currentEra = currentEra;
           state.currentTime = currentTime;
           state.changed = true;
         }
@@ -143,32 +144,25 @@ const modifier = (text) => {
     let instructions = `\nDo not recreate or reference any system commands such as [settime], [advance], [reset], (sleep ...), or (advance ...). Only emit (sleep ...)/(advance ...) when explicitly instructed in the scratchpad and never describe these commands to the user.`;
 
     if (getWTGBooleanSetting("Enable Dynamic Time")) {
-      let sleepInstruction = "When the user decides to sleep on the previous turn, start the action with (sleep X units) where X is a number and units can be hours, minutes, days, weeks, months, or years.";
-      let advanceInstruction = "When a notable chunk of time passes in the adventure, start the action with (advance X units) using the same format.";
-      instructions += `\n\n<scratchpad>
-${sleepInstruction} ${advanceInstruction}
-</scratchpad>`;
+      let sleepInstruction = 'When the user decides to sleep on the previous turn, start the action with (sleep X units) where X is a number and units can be hours, minutes, days, weeks, months, or years.';
+      let advanceInstruction = 'When a notable chunk of time passes in the adventure, start the action with (advance X units) using the same format.';
+      instructions += `\n\n<scratchpad>\n${sleepInstruction} ${advanceInstruction}\n</scratchpad>`;
     }
 
     modifiedText += instructions;
 
     // Add current date and time to context if initialized
     if (state.settimeInitialized && state.currentDate !== '01/01/1900' && state.currentTime !== 'Unknown') {
-      modifiedText += `\nCurrent date: ${state.currentDate}; Current time: ${state.currentTime}`;
+      modifiedText += `\nCurrent date: ${getCurrentDateDisplay()}; Current time: ${state.currentTime}`;
     }
   }
 
   // ========== INNER-SELF CONTEXT PROCESSING ==========
-  // InnerSelf modifies the global 'text' variable directly
-  // We need to set global text to our modified text, let InnerSelf process it,
-  // then return the modified global text
-  text = modifiedText;
-  InnerSelf("context");
-  // InnerSelf may have modified global 'text' with brain content
-  // Use the global text if it was modified, otherwise keep our modifiedText
-  const finalText = (text && text !== modifiedText) ? text : modifiedText;
+  globalThis.text = modifiedText;
+  InnerSelf('context');
+  modifiedText = globalThis.text;
 
-  return { text: finalText, stop };
+  return { text: modifiedText, stop };
 };
 
 modifier(text);

@@ -41,14 +41,18 @@ The previous version had an issue where the AutoCards function wasn't properly a
 ## 🎯 First Use
 
 1. Start your adventure (or continue existing one)
-2. Use story mode to enter: `[settime 06/15/2023 8:00 AM]`
+2. Use story mode to enter: `[settime 06/15/2023 8:00 AM AD]`
+   - For BC dates, use something like `[settime 03/15/44 9:00 AM BC]`
+   - If you leave the era off, WTG defaults to AD: `[settime 06/15/2023 8:00 AM]`
 3. Configure AutoCards via the "Configure Auto-Cards" storycard that appears
 
 ## 📖 Basic Usage
 
 ### WTG Commands (in square brackets)
 
-- `[settime 06/15/2023 8:00 AM]` - Set starting date/time
+- `[settime 06/15/2023 8:00 AM AD]` - Set starting date, time, and era
+- `[settime 03/15/44 9:00 AM BC]` - Example BC starting date
+- `[settime 06/15/2023 8:00 AM]` - Same as above, defaults to AD when era is omitted
 - `[advance 2 hours]` - Advance time (units: hours, days, months, years)
 - `[sleep]` - Sleep to next morning (6-9 hours)
 - `[reset]` - Reset to most recent time mentioned in story

@@ -218,9 +218,9 @@ In `output.js` (lines 206-218), the system was adding timestamps to ALL storycar
 
 **How It Works**:
 - At scenario start (action count ≤ 1), all storycards are scanned for `[settime date time]` commands
-- Format: `[settime mm/dd/yyyy time]` (e.g., `[settime 08/15/2024 3:30 pm]`)
+- Format: `[settime mm/dd/year time AD]` or `[settime mm/dd/year time BC]` (e.g., `[settime 08/15/2024 3:30 pm AD]`, `[settime 03/15/44 9:00 am BC]`, or `[settime 08/15/2024 3:30 pm]` to default to AD)
 - Supports various date separators: `/`, `-`, `.`
-- Supports both 2-digit and 4-digit years
+- Supports 1-6 digit years, including single-digit years
 - Time formats: `3:30 pm`, `3 pm`, `15:30`, etc.
 - Once found and processed, the command is removed from the storycard
 - The opening prompt is skipped, and the AI generates the first response immediately
@@ -325,10 +325,12 @@ The combined system executes in this order to ensure compatibility:
 
 ### Commands (all enclosed in brackets `[command]`)
 
-#### [settime mm/dd/yyyy time]
-Set the starting date and time for your adventure.
-- **Format**: `[settime 06/15/2023 3:30 PM]`
-- **Date**: mm/dd/yyyy or dd/mm/yyyy (auto-detected)
+#### [settime mm/dd/year time AD]
+Set the starting date, era, and time for your adventure.
+- **Format**: `[settime 06/15/2023 3:30 PM AD]`, `[settime 03/15/44 9:00 AM BC]`
+- **Date**: mm/dd/year or dd/mm/year (auto-detected), with 1-6 digit years
+- **Year flow**: BC years count down as time advances; AD years count up
+- **Era**: Optional `BC` or `AD` (`CE` is also accepted as an AD alias, and `BCE` as a BC alias); if omitted, it defaults to `AD`
 - **Time**: 12-hour format (3:30 PM) or 24-hour format (15:30)
 - **Effect**: Resets turn time to zero, updates all existing timestamps
 
@@ -395,7 +397,7 @@ AutoCards includes extensive configuration options via the "Configure Auto-Cards
    - `output.js`
 
 2. Start a new adventure or continue an existing one
-3. Use `[settime mm/dd/yyyy time]` to set your starting date and time
+3. Use `[settime 06/15/2023 8:00 AM AD]` to set your starting date, era, and time (or omit the era to default to AD)
 4. Configure AutoCards via the "Configure Auto-Cards" storycard (appears automatically)
 
 ### During Adventure

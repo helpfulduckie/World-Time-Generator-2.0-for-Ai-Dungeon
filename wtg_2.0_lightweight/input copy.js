@@ -8,6 +8,8 @@ const modifier = (text) => {
   // Ensure state.turnTime is always initialized
   state.turnTime = state.turnTime || {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
 
+  ensureWTGEras();
+
   // Check if WTG is disabled entirely
   if (getWTGBooleanSetting("Disable WTG Entirely")) {
     return {text: text};
@@ -17,7 +19,9 @@ const modifier = (text) => {
   if (state.startingDate === undefined) {
     state.startingDate = '01/01/1900';
     state.startingTime = 'Unknown';
+    state.startingEra = DEFAULT_WTG_ERA;
     state.currentDate = '01/01/1900';
+    state.currentEra = DEFAULT_WTG_ERA;
     state.currentTime = 'Unknown';
     state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
     state.settimeInitialized = false;
@@ -32,10 +36,12 @@ const modifier = (text) => {
     const timeConfig = parseWTGTimeConfig();
     if (timeConfig && timeConfig.initialized) {
       state.startingDate = timeConfig.startingDate;
+      state.startingEra = timeConfig.startingEra;
       state.startingTime = timeConfig.startingTime;
       state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       // Mark settime as initialized (persists marker to WTG Data card)
       markSettimeAsInitialized();
@@ -60,10 +66,12 @@ const modifier = (text) => {
       const day = now.getDate();
       const year = now.getFullYear();
       state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
+      state.startingEra = DEFAULT_WTG_ERA;
       state.startingTime = '9:00 AM';  // Default to 9 AM (server time may differ from user's timezone)
       state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
+      const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
       state.currentDate = currentDate;
+      state.currentEra = currentEra;
       state.currentTime = currentTime;
       markSettimeAsInitialized();
       updateDateTimeCard();
@@ -79,157 +87,185 @@ const modifier = (text) => {
 
   let modifiedText = text;
   let messages = [];
+  let terminalTimeMessage = null;
+  const WTG_COMMAND_NAMES = new Set(['settime', 'advance', 'sleep', 'reset', 'time']);
+  const bracketCommandRegex = /\[([^\]]+)\]/g;
+  const commandQueue = [];
+  let rebuiltText = '';
+  let lastIndex = 0;
 
-  // Check if user action is [sleep] command to trigger sleep
-  if (text.trim().toLowerCase() === '[sleep]') {
-    if (state.currentTime !== 'Unknown' && /\d/.test(state.currentTime)) {
-      let sleepHours = Math.floor(Math.random() * 3) + 6;
-      let sleepMinutes = Math.floor(Math.random() * 60);
-      let add = {hours: sleepHours, minutes: sleepMinutes};
-      state.turnTime = addToTurnTime(state.turnTime, add);
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
-      state.currentDate = currentDate;
-      state.currentTime = currentTime;
-      let wakeMessage = (add.days > 0 || state.turnTime.days > 0) ? "the next day" : "later that day";
-      const ttMarker = formatTurnTime(state.turnTime);
-      messages.push(`[SYSTEM] You go to sleep and wake up ${wakeMessage} on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
+  let commandMatch;
+  while ((commandMatch = bracketCommandRegex.exec(text)) !== null) {
+    rebuiltText += text.slice(lastIndex, commandMatch.index);
+
+    const commandBody = commandMatch[1].trim();
+    const parts = commandBody.split(/\s+/);
+    const command = (parts[0] || '').toLowerCase();
+
+    if (WTG_COMMAND_NAMES.has(command)) {
+      commandQueue.push({command, parts});
+      rebuiltText += ' ';
     } else {
-      // When time is Unknown, set it to 8:00 AM and reset turn time
-      state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-      state.turnTime = addToTurnTime(state.turnTime, {days: 1});
-      state.startingTime = "8:00 AM";
-      const {currentDate, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime);
-      state.currentDate = currentDate;
-      state.currentTime = currentTime;
-      const ttMarker = formatTurnTime(state.turnTime);
-      messages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${state.currentDate} at ${state.currentTime}. [[${ttMarker}]]`);
+      rebuiltText += commandMatch[0];
     }
+
+    lastIndex = bracketCommandRegex.lastIndex;
+  }
+  rebuiltText += text.slice(lastIndex);
+  modifiedText = rebuiltText.replace(/\s{2,}/g, ' ').trim();
+
+  for (const {command, parts} of commandQueue) {
+    if (command === 'sleep') {
+      if (state.currentTime !== 'Unknown' && /\d/.test(state.currentTime)) {
+        let sleepHours = Math.floor(Math.random() * 3) + 6;
+        let sleepMinutes = Math.floor(Math.random() * 60);
+        let add = {hours: sleepHours, minutes: sleepMinutes};
+        state.turnTime = addToTurnTime(state.turnTime, add);
+        const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+        state.currentDate = currentDate;
+        state.currentEra = currentEra;
+        state.currentTime = currentTime;
+        let wakeMessage = (add.days > 0 || state.turnTime.days > 0) ? "the next day" : "later that day";
+        const ttMarker = formatTurnTime(state.turnTime);
+        messages.push(`[SYSTEM] You go to sleep and wake up ${wakeMessage} on ${getCurrentDateDisplay()} at ${state.currentTime}. [[${ttMarker}]]`);
+      } else {
+        // When time is Unknown, set it to 8:00 AM and reset turn time
+        state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+        state.turnTime = addToTurnTime(state.turnTime, {days: 1});
+        state.startingTime = "8:00 AM";
+        const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate, state.startingTime, state.turnTime, state.startingEra);
+        state.currentDate = currentDate;
+        state.currentEra = currentEra;
+        state.currentTime = currentTime;
+        const ttMarker = formatTurnTime(state.turnTime);
+        messages.push(`[SYSTEM] You go to sleep and wake up the next morning on ${getCurrentDateDisplay()} at ${state.currentTime}. [[${ttMarker}]]`);
+      }
       state.insertMarker = true;
       state.changed = true;
       // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
       state.turnTimeModifiedByCommand = true;
       setSleepCooldown({hours: 8});
-      modifiedText = '';
-    }
-    // Handle bracketed commands
-    else {
-    let trimmedText = text.trim();
-    if (trimmedText.match(/^\[(.+?)\]$/)) {
-      const commandStr = trimmedText.match(/^\[(.+?)\]$/)[1].trim().toLowerCase();
-      const parts = commandStr.split(/\s+/);
-      const command = parts[0];
-      
-      if (command === 'settime') {
-        let dateStr = parts[1];
-        let timeStr = parts.slice(2).join(' ');
-        if (dateStr) {
-          dateStr = dateStr.replace(/[.-]/g, '/');
-          let [part1, part2, year] = dateStr.split('/').map(Number);
-          if (year < 100) year += 2000;
-          let month = part1;
-          let day = part2;
-          if (month > 12 && day <= 12) [month, day] = [day, part1];
-          if (isValidDate(month, day, year)) {
-            state.startingDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
-            if (timeStr) {
-              state.startingTime = normalizeTime(timeStr);
-            } else {
-              state.startingTime = 'Unknown';
-            }
-            state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
-            const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
-            state.currentDate = currentDate;
-            state.currentTime = currentTime;
-
-            // Update timestamps in all existing storycards to reflect the new time
-            updateAllStoryCardTimestamps(state.currentDate, state.currentTime);
-
-            const ttMarker = formatTurnTime(state.turnTime);
-            messages.push(`[SYSTEM] Starting date and time set to ${state.startingDate} ${state.startingTime}. [[${ttMarker}]]`);
-            // Mark settime as initialized
-            markSettimeAsInitialized();
-            // Initialize storycards
-            updateDateTimeCard();
-            getWTGSettingsCard();
-            getCooldownCard();
-            getWTGCommandsCard();
-            state.insertMarker = true;
-            state.changed = true;
-            // Clear any existing AI command cooldowns when user resets time (Normal mode only)
-            if (!isLightweightMode()) {
-              clearCommandCooldowns("user settime command");
-            }
+    } else if (command === 'settime') {
+      let dateStr = parts[1];
+      let timeStr = parts.slice(2).join(' ');
+      if (dateStr) {
+        const parsedSettime = normalizeSettimeArgs(dateStr, timeStr, DEFAULT_WTG_ERA);
+        if (parsedSettime) {
+          state.startingDate = parsedSettime.startingDate;
+          state.startingEra = parsedSettime.startingEra;
+          if (parsedSettime.startingTime) {
+            state.startingTime = parsedSettime.startingTime;
           } else {
-            messages.push(`[Invalid date: ${dateStr}. Use mm/dd/yyyy or dd/mm/yyyy.]`);
+            state.startingTime = 'Unknown';
           }
-        }
-      } else if (command === 'advance') {
-        if (state.startingTime === 'Unknown') {
-          messages.push(`[Time advancement not applied as current time is descriptive (${state.startingTime}). Use [settime] to set a numeric time if needed.]`);
-        } else {
-          const amount = parseInt(parts[1], 10);
-          const unit = parts[2] ? parts[2].toLowerCase() : 'hours';
-          let add = {};
-          if (unit.startsWith('y')) {
-            add.years = amount;
-          } else if (unit.startsWith('m')) {
-            add.months = amount;
-          } else if (unit.startsWith('d')) {
-            add.days = amount;
-          } else {
-            add.hours = amount;
-          }
-          state.turnTime = addToTurnTime(state.turnTime, add);
-          const {currentDate, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime);
+          state.turnTime = {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
+          const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
           state.currentDate = currentDate;
+          state.currentEra = currentEra;
           state.currentTime = currentTime;
+
+          // Update timestamps in all existing storycards to reflect the new time
+          updateAllStoryCardTimestamps(state.currentDate, state.currentTime);
+
           const ttMarker = formatTurnTime(state.turnTime);
-          messages.push(`[SYSTEM] Advanced ${amount} ${unit}. New date/time: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
+          messages.push(`[SYSTEM] Starting date and time set to ${getStartingDateDisplay()} ${state.startingTime}. [[${ttMarker}]]`);
+          // Mark settime as initialized
+          markSettimeAsInitialized();
+          // Initialize storycards
+          updateDateTimeCard();
+          getWTGSettingsCard();
+          getCooldownCard();
+          getWTGCommandsCard();
           state.insertMarker = true;
           state.changed = true;
-          // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
-          state.turnTimeModifiedByCommand = true;
-          setAdvanceCooldown({minutes: 5});
-        }
-      } else if (command === 'reset') {
-        let newDate = getCurrentDateFromHistory('', true);
-        let newTime = getCurrentTimeFromHistory('', true);
-        let valid = false;
-        if (newDate) {
-          let [part1, part2, year] = newDate.split('/').map(Number);
-          if (year < 100) year += 2000;
-          let month = part1;
-          let day = part2;
-          if (month > 12 && day <= 12) [month, day] = [day, part1];
-          if (isValidDate(month, day, year)) {
-            let tempCurrentDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`;
-            let tempCurrentTime = newTime ? normalizeTime(newTime) : state.startingTime;
-            state.turnTime = getDateDiff(state.startingDate, state.startingTime, tempCurrentDate, tempCurrentTime);
-            state.currentDate = tempCurrentDate;
-            state.currentTime = tempCurrentTime;
-
-            // Update timestamps in all existing storycards to reflect the reset time
-            updateAllStoryCardTimestamps(state.currentDate, state.currentTime);
-
-            // Clear cooldowns when time is reset
-            clearCommandCooldowns("reset command");
-
-            valid = true;
+          // Clear any existing AI command cooldowns when user resets time (Normal mode only)
+          if (!isLightweightMode()) {
+            clearCommandCooldowns("user settime command");
           }
-        }
-        if (valid) {
-          const ttMarker = formatTurnTime(state.turnTime);
-          messages.push(`[SYSTEM] Date and time reset to most recent mention: ${state.currentDate} ${state.currentTime}. [[${ttMarker}]]`);
-          state.insertMarker = true;
-          state.changed = true;
         } else {
-          messages.push(`[No date or time mentions found in history.]`);
+          messages.push(`[Invalid date: ${dateStr}. Example commands: [settime 06/15/2023 8:00 AM AD], [settime 03/15/44 9:00 AM BC], or [settime 06/15/2023 8:00 AM] to default to AD.]`);
         }
-      } else {
-        messages.push('[Invalid command. Available: settime, advance, reset, sleep.]');
       }
-      modifiedText = '';
+    } else if (command === 'advance') {
+      if (state.startingTime === 'Unknown') {
+        messages.push(`[Time advancement not applied as current time is descriptive (${state.startingTime}). Use [settime] to set a numeric time if needed.]`);
+      } else {
+        const amount = parseInt(parts[1], 10);
+        if (isNaN(amount) || amount <= 0) {
+          messages.push('[Invalid advance command. Use: [advance N hours/days/months/years]. Example: [advance 2 hours]]');
+          continue;
+        }
+
+        const unit = parts[2] ? parts[2].toLowerCase() : 'hours';
+        let add = {};
+        if (unit.startsWith('y')) {
+          add.years = amount;
+        } else if (unit.startsWith('min')) {
+          add.minutes = amount;
+        } else if (unit.startsWith('mo')) {
+          add.months = amount;
+        } else if (unit.startsWith('d')) {
+          add.days = amount;
+        } else {
+          add.hours = amount;
+        }
+        state.turnTime = addToTurnTime(state.turnTime, add);
+        const {currentDate, currentEra, currentTime} = computeCurrent(state.startingDate || '01/01/1900', state.startingTime || 'Unknown', state.turnTime, state.startingEra);
+        state.currentDate = currentDate;
+        state.currentEra = currentEra;
+        state.currentTime = currentTime;
+        const ttMarker = formatTurnTime(state.turnTime);
+        messages.push(`[SYSTEM] Advanced ${amount} ${unit}. New date/time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`);
+        state.insertMarker = true;
+        state.changed = true;
+        // Flag to prevent context.js from overwriting turnTime (marker isn't in history yet)
+        state.turnTimeModifiedByCommand = true;
+        setAdvanceCooldown({minutes: 5});
+      }
+    } else if (command === 'time') {
+      const ttMarker = formatTurnTime(state.turnTime);
+      terminalTimeMessage = `[SYSTEM] Current Date and Time: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`;
+      state.pendingTimeResponse = terminalTimeMessage;
+      state.timeCommandUsed = true;
+      break;
+    } else if (command === 'reset') {
+      let newDate = getCurrentDateFromHistory('', true);
+      let newTime = getCurrentTimeFromHistory('', true);
+      let valid = false;
+      if (newDate) {
+        const parsedResetDate = parseDateString(newDate, getCurrentEra());
+        if (parsedResetDate && isValidDate(parsedResetDate.month, parsedResetDate.day, parsedResetDate.year, parsedResetDate.era)) {
+          let tempCurrentDate = formatDateForStorage(parsedResetDate);
+          let tempCurrentEra = parsedResetDate.era;
+          let tempCurrentTime = newTime ? normalizeTime(newTime) : state.startingTime;
+          state.turnTime = getDateDiff(state.startingDate, state.startingTime, tempCurrentDate, tempCurrentTime, state.startingEra, tempCurrentEra);
+          state.currentDate = tempCurrentDate;
+          state.currentEra = tempCurrentEra;
+          state.currentTime = tempCurrentTime;
+
+          // Update timestamps in all existing storycards to reflect the reset time
+          updateAllStoryCardTimestamps(state.currentDate, state.currentTime);
+
+          // Clear cooldowns when time is reset
+          clearCommandCooldowns("reset command");
+
+          valid = true;
+        }
+      }
+      if (valid) {
+        const ttMarker = formatTurnTime(state.turnTime);
+        messages.push(`[SYSTEM] Date and time reset to most recent mention: ${getCurrentDateDisplay()} ${state.currentTime}. [[${ttMarker}]]`);
+        state.insertMarker = true;
+        state.changed = true;
+      } else {
+        messages.push(`[No date or time mentions found in history.]`);
+      }
     }
+  }
+
+  if (terminalTimeMessage) {
+    messages = [terminalTimeMessage];
+    modifiedText = '';
   }
 
   // Add messages to modified text
