@@ -747,7 +747,7 @@ For bug reports or feature requests, contact via Discord or Email.
 
 ## License & Credits
 
-**Currently Maintained by**: helpfulduckie
+**Currently Maintained by**: helpfulduckie   
 **Originally Created by**: thedenial   
 **License**: Apache 2.0
 
