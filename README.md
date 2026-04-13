@@ -679,11 +679,11 @@ After setup:
 
 ## Support & Bug Reports
 
-**Developer**: thedenial. (with period)  
-**Discord**: thedenial.  
-**Date**: October 2025
+**Developer**: helpfulduckie
+**Discord**: bluestar
+**Email**: helpfulduckie@gmail.com
 
-For bug reports or feature requests, contact via Discord.
+For bug reports or feature requests, contact via Discord or Email.
 
 ---
 
@@ -747,7 +747,8 @@ For bug reports or feature requests, contact via Discord.
 
 ## License & Credits
 
-**Created by**: thedenial   
+**Currently Maintained by**: helpfulduckie
+**Originally Created by**: thedenial   
 **License**: Apache 2.0
 
 This is a community-created tool for enhancing AI Dungeon experiences. Not officially affiliated with Latitude (AI Dungeon creators).
