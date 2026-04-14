@@ -162,8 +162,6 @@ const modifier = (text) => {
     // If state.turnTime doesn't exist, leave currentDate/currentTime unchanged
   }
 
-  modifiedText += `\nDo not recreate or reference any system commands such as [settime], [advance], [reset], (sleep ...), or (advance ...). Only emit (sleep ...)/(advance ...) when explicitly instructed in the scratchpad and never describe these commands to the user.`;
-
   // Clean up WTG Data card by removing entries with timestamps higher than current turn time
   cleanupWTGDataCardByTimestamp(state.turnTime);
 
@@ -174,26 +172,22 @@ const modifier = (text) => {
 
   state.insertMarker = (charsAfter >= 7000);
 
-  let instructions = `\nDo not recreate or reference any system commands such as [settime], [advance], [reset], (sleep ...), or (advance ...). Only emit (sleep ...)/(advance ...) when explicitly instructed in the scratchpad and never describe these commands to the user.`;
+  let instructions = `# Do not recreate or reference any system commands such as [settime], [advance], or [reset].`;
 
   // Add scratchpad with AI command instructions if Dynamic Time is enabled
   if (getWTGBooleanSetting("Enable Dynamic Time")) {
     let sleepInstruction = "When the user decides to sleep on the previous turn, start the action with (sleep X units) where X is a number and units can be hours, minutes, days, weeks, months, or years.";
     let advanceInstruction = "When a notable chunk of time passes in the adventure, start the action with (advance X units) using the same format.";
 
-    instructions += `\n\n<scratchpad>
-${sleepInstruction} ${advanceInstruction}
-</scratchpad>`;
+    instructions += `\n\n# ${sleepInstruction} ${advanceInstruction}`;
   }
-
-  modifiedText += instructions;
 
   // Add current date and time to context (only if settime has been initialized)
   let dateTimeInjection = '';
   if (state.settimeInitialized && state.currentDate !== '01/01/1900' && state.currentTime !== 'Unknown') {
     dateTimeInjection = `\nCurrent date: ${getCurrentDateDisplay()}; Current time: ${state.currentTime}`;
   }
-  modifiedText = modifiedText + dateTimeInjection;
+  modifiedText = instructions + modifiedText + dateTimeInjection;
 
   // ============ AUTOCARDS PROCESSING SECOND ============
   [text, stop] = AutoCards("context", modifiedText, stop);
