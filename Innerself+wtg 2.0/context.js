@@ -140,21 +140,22 @@ const modifier = (text) => {
 
     state.insertMarker = (charsAfter >= 7000);
 
-    // Add WTG context injection
-    let instructions = `\nDo not recreate or reference any system commands such as [settime], [advance], [reset], (sleep ...), or (advance ...). Only emit (sleep ...)/(advance ...) when explicitly instructed in the scratchpad and never describe these commands to the user.`;
+    let instructions = `# Do not recreate or reference any system commands such as [settime], [advance], or [reset].`;
 
+    // Add scratchpad with AI command instructions if Dynamic Time is enabled
     if (getWTGBooleanSetting("Enable Dynamic Time")) {
-      let sleepInstruction = 'When the user decides to sleep on the previous turn, start the action with (sleep X units) where X is a number and units can be hours, minutes, days, weeks, months, or years.';
-      let advanceInstruction = 'When a notable chunk of time passes in the adventure, start the action with (advance X units) using the same format.';
-      instructions += `\n\n<scratchpad>\n${sleepInstruction} ${advanceInstruction}\n</scratchpad>`;
+      let sleepInstruction = "When the user decides to sleep on the previous turn, start the action with (sleep X units) where X is a number and units can be hours, minutes, days, weeks, months, or years.";
+      let advanceInstruction = "When a notable chunk of time passes in the adventure, start the action with (advance X units) using the same format.";
+
+      instructions += `\n\n# ${sleepInstruction} ${advanceInstruction}`;
     }
 
-    modifiedText += instructions;
-
-    // Add current date and time to context if initialized
+    // Add current date and time to context (only if settime has been initialized)
+    let dateTimeInjection = '';
     if (state.settimeInitialized && state.currentDate !== '01/01/1900' && state.currentTime !== 'Unknown') {
-      modifiedText += `\nCurrent date: ${getCurrentDateDisplay()}; Current time: ${state.currentTime}`;
+      dateTimeInjection = `\nCurrent date: ${getCurrentDateDisplay()}; Current time: ${state.currentTime}`;
     }
+    modifiedText = instructions + modifiedText + dateTimeInjection;
   }
 
   // ========== INNER-SELF CONTEXT PROCESSING ==========
