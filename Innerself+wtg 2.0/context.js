@@ -140,40 +140,40 @@ const modifier = (text) => {
 
     state.insertMarker = (charsAfter >= 7000);
 
-    let instructions = `# Do not recreate or reference any system commands such as [settime], [advance], or [reset].`;
+    let instructions = `Do not recreate or reference any system commands such as [settime], [advance], or [reset].`;
 
     // Add scratchpad with AI command instructions if Dynamic Time is enabled
     if (getWTGBooleanSetting("Enable Dynamic Time")) {
       let sleepInstruction = "When the user decides to sleep on the previous turn, start the action with (sleep X units) where X is a number and units can be hours, minutes, days, weeks, months, or years.";
       let advanceInstruction = "When a notable chunk of time passes in the adventure, start the action with (advance X units) using the same format.";
 
-      instructions += `\n\n# ${sleepInstruction} ${advanceInstruction}`;
+      instructions = `${instructions} \n${sleepInstruction} \n${advanceInstruction}`;
     }
 
     // Add current date and time to context (only if settime has been initialized)
     let dateTimeInjection = '';
     if (state.settimeInitialized && state.currentDate !== '01/01/1900' && state.currentTime !== 'Unknown') {
-      dateTimeInjection = `\nCurrent date: ${getCurrentDateDisplay()}; Current time: ${state.currentTime}`;
+      dateTimeInjection = `Current date: ${getCurrentDateDisplay()}; Current time: ${state.currentTime}`;
     }
+
+    let additionalAuthorsNote = `${instructions}\n${dateTimeInjection}`;
 
     // Find the [Author's note: ...] section and inject the date/time info inside the [] if it exists, otherwise add one and insert it a paragraph back from the end of the text.
     const authorsNoteMatch = modifiedText.match(/\[Author's note:.*?\]/);
     if (authorsNoteMatch) {
       const fullMatch = authorsNoteMatch[0];
-      const modifiedAuthorsNote = fullMatch.slice(0, -1) + (dateTimeInjection ? ` ${dateTimeInjection}]` : '');
+      const modifiedAuthorsNote = fullMatch.slice(0, -1) + `${additionalAuthorsNote}]`;
       modifiedText = modifiedText.replace(fullMatch, modifiedAuthorsNote);
     } else if (dateTimeInjection) {
       // Add a new [Author's note: ...] section with the date/time info a paragraph back from the end
       const paragraphs = modifiedText.split('\n\n');
       if (paragraphs.length > 1) {
-        paragraphs.splice(paragraphs.length - 1, 0, `[Author's note: ${dateTimeInjection}]`);
+        paragraphs.splice(paragraphs.length - 1, 0, `[Author's note: ${additionalAuthorsNote}]`);
         modifiedText = paragraphs.join('\n\n');
       } else {
-        modifiedText += `\n\n[Author's note: ${dateTimeInjection}]`;
+        modifiedText += `\n\n[Author's note: ${additionalAuthorsNote}]`;
       }
     }
-
-    modifiedText = instructions + modifiedText;
   }
 
   // ========== INNER-SELF CONTEXT PROCESSING ==========
