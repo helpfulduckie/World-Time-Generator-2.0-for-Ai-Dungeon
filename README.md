@@ -1,118 +1,164 @@
-# World Time Generator (WTG) 2.0
+# World Time Generator 3.0
 
 > Advanced time tracking and entity management system for AI Dungeon scenarios
 
-# Latest version: 2.1.25
+by helpfulduckie (aka bluestar) | based on World Time Generator 2.0 by thedenial.
 
-Now with automatic storycard [settime] detection! Pre-configure your scenario's starting time without requiring players to manually enter commands by simply putting the [settime] command in any storycard within your scenario. The command will automatically be removed from the storycard.
+---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Which Variant Should I Use?](#which-variant-should-i-use)
 - [System Commands](#system-commands)
-- [Storycard Markers](#storycard-markers)
-- [Which Version Should I Use?](#which-version-should-i-use)
-- [WTG 2.0 (Full Version)](#wtg-20-full-version)
-- [WTG 2.0 Lightweight](#wtg-20-lightweight)
-- [WTG 2.0 Scenario (Mode Switching)](#wtg-20-scenario-mode-switching)
+- [Features](#features)
 - [Installation](#installation)
-- [Quick Start Guide](#quick-start-guide)
+- [Settings List](#settings-list)
+- [Credits](#credits)
 
 ---
 
 ## Overview
 
-The World Time Generator (WTG) is a comprehensive scripting system for AI Dungeon that automatically tracks time progression and manages game entities throughout your adventure. Available in two versions to suit different needs.
+World Time Generator (WTG) is a scripting system for AI Dungeon that automatically tracks the passage of time throughout your adventure. As the story unfolds, WTG keeps a running clock and calendar, displays the current date and time in your storycards, and automatically creates and timestamps storycards for the characters and locations the AI introduces.
 
-### Key Features
+WTG is designed to be installed once by a scenario author and then mostly invisible to players. You set a starting date, play your adventure, and WTG handles the rest. A handful of commands let you jump forward in time, skip ahead to morning after sleeping, or jump to a specific date or time when the story calls for it.
 
-- **Automatic Time Tracking**: Time advances based on story length
-- **Persistent Date & Time**: Current date and time displayed in storycards
-- **Entity Management**: Automatic storycard generation for characters and locations (Full version)
-- **Adventure Erasing Detection**: Handles time jumps when rewinding story
-- **Turn Data Tracking**: Records adventure history for consistency
-- **Highly Configurable**: Multiple settings to customize behavior (Full version)
+WTG 3.0 comes in three variants depending on what other systems your scenario uses:
+
+| Variant | Use when... |
+|---------|-------------|
+| **wtg-standard** | You're using WTG on its own |
+| **wtg-is** | Your scenario also uses the Inner Self (NPC memory) system by LewdLeah |
+| **wtg-lola** | Your scenario also uses the LOLA (Localization) system (also) by LewdLeah |
+
+All three variants share the same commands and settings. The only difference is how they integrate with those other systems.
+
+---
+
+## Which Variant Should I Use?
+
+**Most scenarios:** Use **wtg-standard**. It's the full-featured version with no external dependencies.
+
+**If you use Inner Self:** Use **wtg-is**. Inner Self is a character simulation system by LewdLeah that gives NPCs persistent memory and adaptive personalities. The wtg-is variant is built to work alongside it without conflicts.
+
+**If you use LOLA:** Use **wtg-lola**. The wtg-lola variant integrates WTG's time tracking with the LOLA system, allowing you to translate the things WTG tells the AI into your desired language once so no English sneaks into your game.
+
+> Do not mix scripts from different variants. All four files (library, input, context, output) must come from the same variant folder.
 
 ---
 
 ## System Commands
 
-### Universal Commands (All Versions)
+### Player Commands
 
-These commands work in all versions of WTG:
+These commands work in square brackets and can be typed as part of any action.
 
-#### `[settime mm/dd/year time AD]`
-**Set starting date, era, and time**
+#### `[setStartTime mm/dd/year time ERA]`
+**Set the starting date and time.**
 
 ```
-[settime 06/15/2023 8:00 AM]
-[settime 12/25/2024 11:30 PM]
-[settime 03/15/44 9:00 am BC]
-[settime 01/01/7 12:00 am AD]
+[setStartTime 06/15/2023 8:00 AM]
+[setStartTime 12/25/2024 11:30 PM AD]
+[setStartTime 03/15/44 9:00 AM BC]
+[setStartTime 01/01/7 12:00 AM AD]
 ```
 
-- Years support 1-6 digits, including single-digit years
-- `BC` years count down as time advances; `AD` years count up
+- Supported eras: `AD` / `CE` (counts up) and `BC` / `BCE` (counts down)
 - If you omit the era, it defaults to `AD`
-- `AD` is the standard era label; `CE` is also accepted as an AD alias, and `BCE` is accepted as a BC alias
+- Years support 1–6 digits, including single-digit years
 
-**NEW: Storycard [settime] Detection (v2.1.23)**
-You can also add `[settime]` directly into any storycard entry! When the scenario starts, the script will automatically detect it, set the time, remove the command from the storycard, and skip the opening prompt.
+**Setting the time via a storycard:**
+You can also put `[setStartTime]` directly in any storycard entry. When the scenario starts, WTG will detect it, apply the time, and remove the command from the card automatically.
 
-**Example:**
 ```
-[settime 12/25/2024 6:00 am AD]
+[setStartTime 12/25/2024 6:00 AM AD]
 It's Christmas morning in Victorian London...
 ```
 
-**NEW: WTG Time Config Card (v2.1.25) - For Large Scenarios**
+See the [Installation](#installation) section for the recommended **WTG Time Config** storycard approach, which is more efficient for large scenarios.
 
-For scenarios with hundreds of storycards (900+), embedding `[settime]` in storycards can cause performance issues because the script must scan all cards to find the command. Instead, import the **WTG Time Config** storycard for instant O(1) time initialization.
+---
 
-**How to use:**
-1. Import `wtg-time-config-template.json` into your scenario's storycards
-2. Edit the "WTG Time Config" card to set your desired starting date, era, and time (the year can be 1-6 digits; BC counts down, AD counts up)
-3. The script will read time directly from this card without scanning other storycards
-
-**Template format:**
-```json
-{
-  "title": "WTG Time Config",
-  "value": "Starting Date: 01/01/2024\nStarting Era: AD\nStarting Time: 12:00 PM\nInitialized: true",
-  "type": "system"
-}
-```
-
-**Benefits:**
-- O(1) lookup instead of O(n) storycard scan
-- Essential for scenarios with 500+ storycards
-- Easy to edit directly in AI Dungeon
-- Backwards compatible (old scenarios still work)
-
-#### `[advance N unit]`
-**Jump forward in time**
+#### `[advance N unit]` or `[adv N unit]`
+**Jump forward in time.**
 
 ```
 [advance 5 hours]
-[advance 2 days]
+[adv 2 days]
 [advance 1 month]
-[advance 3 years]
+[adv 3 years]
 ```
-**Units:** hours, days, months, years
+
+Accepted units: `minutes` / `min` / `m`, `hours` / `hr` / `h`, `days` / `d`, `weeks` / `wk`, `months` / `mo`, `years` / `yr`
+
+---
 
 #### `[sleep]`
-**Sleep to next morning**
-- Advances 6-9 hours + random minutes
-- Automatically sets time to next morning
+**Sleep until the next morning.**
+
+Advances time by 6–9 hours plus a random number of minutes, landing somewhere in the morning of the next day.
 
 ```
 [sleep]
 ```
 
+You can also sleep for a specific duration:
+
+```
+[sleep 8 hours]
+[sleep 2 days]
+```
+
+---
+
+#### `[goto target]`
+**Jump to a specific time, date, day of the week, or time phase.**
+
+`[goto]` can move forward in time. You can give it a time, a date, a day of the week, or the name of a time phase. In cases of ambiguity, it will always pick the nearest time (In other words, if you say `[goto 10:00 AM]` and it's currently 11 am, it will go to tomorrow, but if its currently 9:00 am, it will advance just an hour).
+
+```
+[goto 10:00 AM]
+[goto 06/20/2023]
+[goto 06/20/2023 10:00 AM]
+[goto Monday]
+[goto Evening]
+```
+
+---
+
+#### `[sleepuntil target]`
+**Like `[goto]`, but also applies the sleep cooldown and flavors the text left behind a little differently.**
+
+Useful for skipping to a specific morning or time of day without being able to accidentally rewind.
+
+```
+[sleepuntil 8:00 AM]
+[sleepuntil Dawn]
+[sleepuntil Friday]
+```
+
+---
+
+#### `[goBack target]`
+**Like `[goto]`, but goes backward in time instead of forward**
+
+`[goBack]` can move backward in time up to your start time/date. You can give it a time, a date, a day of the week, or the name of a time phase.
+
+```
+[goBack 10:00 AM]
+[goBack 06/20/2023]
+[goBack 06/20/2023 10:00 AM]
+[goBack Monday]
+[goBack Evening]
+```
+
+---
+
 #### `[reset]`
-**Reset to most recent date/time mentioned in story**
-- Scans recent history for date/time mentions
-- Updates to the most recent found
+**Reset to the most recent date/time mentioned in the story.**
+
+Scans recent story history for any date or time references and resets WTG's clock to the most recent one found.
 
 ```
 [reset]
@@ -120,638 +166,167 @@ For scenarios with hundreds of storycards (900+), embedding `[settime]` in story
 
 ---
 
-### Scenario Version Only
-
-These additional commands are only available in **WTG 2.0 Scenario**:
-
-#### `[normal]`
-**Switch to Normal mode (full features)**
-- Enables AI entity generation
-- Enables AI-driven time commands
-- Enables all configurable settings
-- Enables advanced AI prompt injections
+#### `[time]`
+**Display the current date and time without advancing it.**
 
 ```
-[normal]
-```
-
-#### `[light]`
-**Switch to Lightweight mode**
-- Disables AI entity generation
-- Disables AI prompts
-- Fixed time rate only
-- Manual storycard control
-
-```
-[light]
-```
-
-#### **Combined Commands**
-You can use multiple commands in a single action:
-
-```
-[light] [settime 08/08/2022 6:00 am]    # Set mode + time
-[normal] [advance 2 hours]              # Switch mode + advance time
+[time]
 ```
 
 ---
 
-### AI-Generated Commands (Full Version Only)
+### AI Commands
 
-When **Enable Dynamic Time** is enabled in the Full Version, the AI can trigger time commands:
+When **Enable Dynamic Time** is turned on, the AI can also issue time commands by including them at the start of its response. These are processed automatically and removed from the output.
 
-#### `(sleep N units)`
-**AI initiates sleep**
-```
-AI: You find a bed and (sleep 8 hours)...
-```
+| Command | Effect |
+|---------|--------|
+| `(sleep N units)` | AI sleeps for the stated duration |
+| `(advance N units)` | AI advances time by the stated amount |
 
-#### `(advance N units)`
-**AI advances time during narrative**
-```
-AI: The journey continued and (advance 3 days) later, you arrived...
-```
-
-These commands:
-- Appear at the start of AI responses
-- Are automatically processed by the script
-- Are removed from the output (unless Debug Mode is enabled)
-- Have cooldown periods to prevent spam
-- **Units:** hours, minutes, days, weeks, months, years
+Both commands have cooldown periods to prevent the AI from advancing time too aggressively.
 
 ---
 
-## Storycard Markers
+### Storycard Markers
 
-These markers can be placed inside storycard entries to control timestamp behavior.
+These markers can be placed in a storycard's **Notes** field to control how WTG handles that card.
 
-### `[e]` - Exclusion Marker
+#### `[e]`/`[wtg-no-timestamp]` — Exclude from timestamps
 
-**Exclude a storycard from timestamp injection**
+Add `[e]` or `[wtg-no-timestamp]` to a card's Notes or Entry to permanently exclude it from receiving WTG timestamps. If the marker was placed in the card's Entry, it is moved to the Notes. `[e]` is always converted to `[wtg-no-timestamp]` by the system. 
 
-Add `[e]` anywhere in a storycard's entry to permanently exclude it from receiving timestamps. The marker is removed when processed, and the card is added to a "WTG Exclusions" system storycard.
+#### `/]` — Custom timestamp placement
 
-**Usage:**
-```
-Card Title: Important NPC
-Keys: npc, character
-Entry: This character should never have timestamps. [e]
-```
-
-**Result:**
-- The `[e]` marker is removed from the entry
-- Card title is added to WTG Exclusions
-- No timestamps will ever be injected into this card
-
-**Notes:**
-- Case insensitive (`[e]` and `[E]` both work)
-- Multiple `[e]` markers are all removed
-- If combined with `/]`, the exclusion takes precedence
+Add `/]` anywhere in a card's Notes to control exactly where the timestamp is inserted. The timestamp will be placed directly before `/]`, and the marker is removed after insertion. Without this marker, timestamps are appended at the end of the card entry but inside any {} or [] you may be encapsulating your story cards with.
 
 ---
 
-### `/]` - Custom Timestamp Placement
-
-**Control where timestamps are inserted**
-
-Add `/]` anywhere in a storycard's entry to specify where the timestamp should be inserted. The timestamp will be placed directly before `/]` (without a blank line), and the marker is removed after insertion.
-
-**Usage:**
-```
-Card Title: Marcus the Warrior
-Keys: marcus, warrior
-Entry: A grizzled veteran with battle scars./]
-
-Additional notes that should appear after the timestamp.
-```
-
-**Result (after timestamp injection):**
-```
-A grizzled veteran with battle scars.Met on 06/15/2023 8:00 AM
-
-Additional notes that should appear after the timestamp.
-```
-
-**Notes:**
-- If no `/]` marker is present, timestamps are appended at the end with a blank line separator (default behavior)
-- The `/]` marker is removed after the timestamp is inserted
-- Useful for keeping additional notes or formatting below the timestamp
-
----
-
-## Which Version Should I Use?
-
-**Overview**
-
-The regular version of WTG 2.0 was tested primarily using Deepseek v3.1, so this script performs best with that model. The lightweight version is primarily for Llama and other smaller models, as they have a hard time with instruction following. Mixtral models can also work with the normal WTG scripts, but I haven't done rigorous testing with those models.
-
-The Scenario version is just a convenient way for mobile users to switch between either script. 
-
-### Choose **WTG 2.0 (Full Version)** if you want:
-
-**Automatic Entity Generation**
-- AI automatically creates storycards for characters: `(CharacterName)`
-- AI automatically creates storycards for locations: `((LocationName))`
-- Description injection: `(((Entity) description text)))`
-
-**Advanced Features**
-- AI-driven time commands: `(sleep 8 hours)`, `(advance 2 days)`
-- Configurable time multiplier for different story pacing
-- Dynamic time adjustment based on action type
-- Entity deprecation when no longer detected in the adventure.
-
-### Choose **WTG 2.0 Lightweight** if you want:
-
-**Simple & Clean**
-- Just time tracking, nothing else
-- No AI prompt interference
-- Predictable, consistent behavior
-
-**Performance**
-- Minimal overhead
-- Faster processing
-- Less complexity
-
-**Manual Control**
-- You create all storycards manually
-- AI never receives entity formatting instructions
-- Pure time tracking without any entity features
-
-### Choose **WTG 2.0 Scenario** if you want:
-
-**Maximum Flexibility**
-- Switch between full features and lightweight mode anytime
-- Start simple, add features as needed
-- Try different approaches in the same adventure
-
-**Convenient Setup**
-- Mode switching during play: `[normal]` or `[light]`
-- Current mode always visible in time display
-
-**Best of Both Worlds**
-- Full WTG 2.0 features when you want them
-- Lightweight performance when you need it
-- Seamless transitions between modes
-
----
-
-## WTG 2.0 (Full Version)
-
-**Current Version**: 2.1.25
-
-### Features
-
-#### AI-Driven Entity Generation
-
-The AI automatically formats entity names with parentheses, which triggers automatic storycard creation:
-
-**Characters** (single parentheses):
-```
-"A warrior named (Marcus) approached the tavern."
-Creates storycard for character "Marcus"
-
-"(The Innkeeper) greeted you warmly."
-Creates storycard for character "The Innkeeper"
-```
-
-**Locations** ((double parentheses)):
-```
-"You entered ((The Golden Tavern))."
-Creates storycard for location "The Golden Tavern"
-
-"The path led to ((Silverwood Forest))."
-Creates storycard for location "Silverwood Forest"
-```
-
-**Descriptions** (((triple parentheses))):
-```
-"(((Marcus) A grizzled veteran with a scarred face)))"
-Adds description to Marcus's storycard
-```
-
-#### Advanced Time Management
-
-- **Base Time**: 1 minute per 700 characters (configurable multiplier)
-- **Dynamic Time**: Adjusts based on keyword detection
-  - Dialogue scenes: Slower time passage
-  - Travel/waiting: Faster time passage
-- **AI Commands**: AI can trigger time jumps with `(sleep X units)` or `(advance X units)`
-- **Cooldown System**: Prevents AI from repeating time commands too frequently
-
-#### Configuration Settings
-
-Located in "World Time Generator Settings" storycard:
-
-```
-Time Duration Multiplier: 1.0          # Adjust time passage speed
-Enable Generated Character Cards: true  # Toggle automatic character cards
-Enable Generated Location Cards: true   # Toggle automatic location cards
-Disable Generated Card Deletion: true   # Prevent card cleanup
-Debug Mode: false                       # Show/hide parentheses in output
-Enable Dynamic Time: true               # Enable smart time adjustment
-Disable WTG Entirely: false            # Emergency disable switch
-```
-
-#### Scripts
-
-- **input copy.js**: Processes player commands and input entity markers
-- **context copy.js**: Injects AI instructions and manages time
-- **output copy.js**: Processes AI output, detects entities, creates storycards
-- **library copy.js**: Core utility functions and data management
-
-### What Gets Created Automatically
-
-1. **Character Storycards**: When AI mentions `(CharacterName)`
-2. **Location Storycards**: When AI mentions `((LocationName))`
-3. **Timestamps**: "Met on [date]" for characters, "Visited [date]" for locations
-4. **WTG Data Card**: Internal tracking for turn data and adventure erasing
-5. **Current Date and Time Card**: Displays current in-story time
-6. **World Time Generator Settings**: Configuration options
-
----
-
-## WTG 2.0 Lightweight
-
-**Current Version**: 2.1.25
-
-### Features
-
-#### Pure Time Tracking
-
-- **Base Rate**: 1 minute per 700 characters
-- **Automatic Timestamps**: All storycards get discovery timestamps
-- **No AI Prompts**: Zero interference with AI generation
-- **No Entity Features**: You create all storycards manually
-
-#### What This Version Does
-
-1. **Tracks Time**: Maintains current date and time based on story length
-2. **Adds Timestamps**: Automatically timestamps storycards when first mentioned
-3. **Handles Commands**: Supports `[settime]`, `[advance]`, `[reset]`, `[sleep]`
-4. **Detects Time Jumps**: Cleans up data when you rewind adventure
-5. **Nothing Else**: No entity generation, no settings, no complexity
-
-#### Scripts
-
-- **input copy.js**: Processes player commands only
-- **context copy.js**: Manages time progression (no AI instructions)
-- **output copy.js**: Adds timestamps to storycards (no entity detection)
-- **library copy.js**: Core time utility functions
-
-### What You Need to Do Manually
-
-1. Create all character storycards yourself
-2. Create all location storycards yourself
-3. Write all storycard content yourself
-4. Update storycards as story progresses
-
-### What Happens Automatically
-
-1. Time advances based on story length
-2. Current date/time updates each turn
-3. Storycards receive timestamps when mentioned
-4. Cleanup when you rewind adventure
-
----
-
-## WTG 2.0 Scenario (Mode Switching)
-
-This version combines both the full features of WTG 2.0 and the simplicity of Lightweight into a single system with **runtime mode switching**. You can toggle between Normal mode (full features) and Lightweight mode (minimal features) at any time during your adventure.
-
-### Key Features
-
-#### Mode Switching
-- **[light]** - Switch to Lightweight mode (disables all advanced features)
-- **[normal]** - Switch to Normal mode (enables all advanced features)
-- **Mode Persistence**: Current mode saved across turns
-- **Mode Display**: Current mode shown in "Current Date and Time" storycard
-
-#### Normal Mode Features
-When in Normal mode, you get all the full WTG 2.0 features:
-- Automatic entity generation: `(CharacterName)`, `((LocationName))`
-- AI-driven time commands: `(sleep 8 hours)`, `(advance 2 days)`
-- Configurable settings and time multipliers
-- Entity deprecation and cooldown systems
-- All advanced AI prompt injections
-
-#### Lightweight Mode Features
-When in Lightweight mode, you get pure time tracking:
-- No AI prompt interference or entity formatting instructions
-- Manual storycard creation only
-- Fixed time rate (1 minute per 700 characters)
-- Automatic timestamps on all storycards
-- Minimal system overhead
-
-### Best For
-
-**Choose WTG 2.0 Scenario if you want:**
-- **Flexibility**: Switch between feature-rich and minimal modes as needed
-- **Testing**: Try both approaches in the same adventure
-- **Convenience**: Start with advanced features, switch to lightweight when needed
-- **Performance**: Use lightweight mode for demanding scenarios
-- **Migration**: Easy transition between full and lightweight approaches
-
-### Example Usage
-
-```
-Initial Setup: [light] [settime 08/08/2022 6:00 am]
-Result: Starts in lightweight mode with custom date/time
-
-During Adventure: [normal]
-Result: Switches to normal mode with all features enabled
-
-For Performance: [light]
-Result: Switches back to lightweight for faster processing
-```
-
-### Mode Switching Behavior
-
-| Feature | Normal Mode | Lightweight Mode |
-|---------|-------------|------------------|
-| Entity Detection | ✅ AI creates `(Name)` and `((Location))` | ❌ Disabled |
-| AI Prompts | ✅ Formatting instructions | ❌ None |
-| Settings Card | ✅ Configurable options | ❌ Not used |
-| Time Commands | ✅ AI can use `(sleep)`/`(advance)` | ❌ Disabled |
-| Storycard Creation | ✅ Automatic | ❌ Manual only |
-| Timestamps | ✅ Automatic | ✅ Automatic |
-| Performance | Good | Excellent |
-
-### Scripts
-
-- **input copy.js**: Multi-command processing and entity markers by mode
-- **context copy.js**: Mode-aware AI instructions and time management
-- **output copy.js**: Mode-specific entity detection and storycard creation
-- **library copy.js**: Combined functions for both modes
-- **Documentation.md**: Comprehensive mode-switching documentation
-
-### When to Switch Modes
-
-**Use Normal Mode When:**
-- You want automatic entity tracking
-- AI should create storycards for characters/locations
-- You need advanced time management features
-- You're okay with AI receiving formatting instructions
-
-**Use Lightweight Mode When:**
-- You prefer manual control over storycards
-- Performance is a priority
-- You want minimal AI prompt interference
-- You're creating storycards yourself
-
-**Switch During Adventure:**
-- Start in lightweight mode for initial setup
-- Switch to normal mode once story is established
-- Switch back to lightweight if performance becomes an issue
-- Switch modes as your story needs change
-
----
-
-## Combined Versions
-
-### AutoCards + WTG 2.0 Lightweight
-
-Located in `autocards+wtg 2.0/`, this version combines WTG Lightweight time tracking with **AutoCards**, a separate storycard generation system by LewdLeah.
-
-**Features:**
-- WTG handles time tracking (same as Lightweight)
-- AutoCards automatically generates storycards from AI output
-- No parentheses markers needed - AutoCards uses its own detection
-- Includes memory compression and card cooldown settings
-
-**Best for:** Users who want automatic storycard generation without the parentheses-based entity system.
-
-### Inner Self + WTG 2.0 Lightweight
-
-Located in `Innerself+wtg 2.0/`, this version combines WTG Lightweight time tracking with **Inner Self**, a character simulation system by LewdLeah.
-
-**Features:**
-- WTG handles time tracking (same as Lightweight)
-- Inner Self grants NPCs private memory ("brains") stored in storycard notes
-- Characters learn, form opinions, and adapt behavior over time
-- Name-based triggers activate relevant NPC brains
-- Includes AutoCards integration (optional, disabled by default)
-
-**Best for:** Users who want NPCs with persistent memory and adaptive personalities.
-
-**Configuration:** Players configure via the "Configure Inner Self" storycard in-game.
+## Features
+
+- **Automatic time tracking** — Time advances roughly 1 minute per ~300 characters of story text (configurable)
+- **Persistent date and time display** — A "Current Date and Time" storycard is kept up to date every turn
+- **Day of week** — WTG calculates the correct day of the week for any date
+- **Time phases** — The time of day is labeled (Predawn, Dawn, Morning, Late Morning, Midday, Afternoon, Evening, Night, After Midnight); fully customizable via a "WTG Time Phases" storycard
+- **Full era support** — AD/CE and BC/BCE calendars with correct arithmetic across era boundaries
+- **Adventure rewind detection** — WTG detects when you erase or rewind story turns and adjusts accordingly
+- **Automatic entity cards** — Characters introduced as `(Name)` and locations introduced as `((Name))` automatically get storycards with "first seen" timestamps
+- **AI-driven time commands** — When enabled, the AI can advance time naturally as part of the narrative
+- **Cooldown system** — Prevents the AI from spamming time commands
+- **Localization** — Display labels (date format, phase names, etc.) can be translated via a "WTG: Localization" storycard
 
 ---
 
 ## Installation
 
-### For AI Dungeon Web
+### Step 1 — Choose Your Variant
 
-1. **Create or Edit a Scenario**
-2. **Open Scripting** (bottom of Details tab)
-3. **Copy Script Content**:
-   - Copy `library copy.js` - Paste into **Library** script
-   - Copy `input copy.js` - Paste into **Input** script
-   - Copy `context copy.js` - Paste into **Context** script
-   - Copy `output copy.js` - Paste into **Output** script
-4. **Save** all scripts
-5. **Start Adventure** and run `[settime 06/15/2023 8:00 AM]` to initialize
+Pick the variant folder that matches your scenario:
 
-### Choosing Your Version
+- `wtg-standard/` — standalone use
+- `wtg-is/` — with Inner Self
+- `wtg-lola/` — with LOLA
 
-- **For Full Features**: Use files from the `wtg_2.0/` directory
-- **For Lightweight**: Use files from the `wtg_2.0_lightweight/` directory
-- **For Mode Switching**: Use files from the `wtg_2.0_scenario/` directory
-- **For AutoCards Integration**: Use files from the `autocards+wtg 2.0/` directory
-- **For Inner Self Integration**: Use files from the `Innerself+wtg 2.0/` directory
-- **Don't Mix**: Never mix scripts from different versions
+### Step 2 — Install the Scripts
 
-### For Large Scenarios (500+ Storycards)
+1. Go to [AI Dungeon](https://aidungeon.com/) on a desktop browser (or switch to desktop view on mobile)
+2. Create a new scenario or open one you're editing
+3. Open the **Details** tab
+4. Scroll down to **Scripting** and toggle **Scripts Enabled** ON
+5. Click **Edit Scripts**
+6. For each of the four tabs below, delete any existing code and paste in the contents of the corresponding file from your chosen variant folder:
 
-If your scenario has hundreds of storycards, import the **WTG Time Config** card to avoid performance issues:
+| Script Tab | File |
+|------------|------|
+| Library | `library.js` |
+| Input | `input.js` |
+| Context | `context.js` |
+| Output | `output.js` |
+
+7. Click the yellow **Save** button
+
+### Step 3 — Add the WTG Time Config Storycard
+
+It's recommended for all scenarios to use the **WTG Time Config** storycard to set the starting date and time. It's required if your scenario has 500 or more storycards (without it, WTG has to scan every card on startup, which is slow).
 
 1. Download `wtg-time-config-template.json` from this repository
 2. Import it into your scenario's storycards
 3. Edit the "WTG Time Config" card to set your starting date, era, and time:
-   ```
-   Starting Date: 06/15/2023
-   Starting Era: AD
-   Starting Time: 8:00 AM
-   Initialized: true
-   ```
-4. The script will read time from this card instantly (no scanning required)
-
----
-
-## Quick Start Guide
-
-### First Time Setup
-
-1. **Start your adventure** from the scenario
-2. **Set initial time** (required):
-   ```
-   [settime 06/15/2023 8:00 AM AD]
-   ```
-3. **Start playing!** Time will track automatically
-
-### Using Full Version
-
-After setup, the AI will automatically:
-- Format character names: `(Marcus) drew his sword`
-- Format locations: `You entered ((The Castle))`
-- Create storycards for all entities
-- Track time based on story events
-
-**Example Flow:**
-```
-You: I enter the tavern looking for work.
-
-AI: As you push through the heavy oak doors of ((The Rusty Anchor)), 
-     the smell of ale and pipe smoke fills your nostrils. (Garth the 
-     Barkeep) looks up from wiping down the counter and nods in your 
-     direction.
-
-Storycards created:
-   - "The Rusty Anchor" (location)
-   - "Garth the Barkeep" (character)
-Time advanced by ~2 minutes
-Current time updated
-```
-
-### Using Lightweight Version
-
-After setup:
-- Create storycards manually for important characters/locations
-- Time tracks automatically
-- Storycards get timestamps when their triggers are mentioned
-- No entity formatting or AI instructions
-
-### Using Scenario Version
-
-After setup:
-- **Default Mode**: Starts in Lightweight mode (minimal features)
-- **Switch Modes**: Use `[normal]` for full features, `[light]` for lightweight
-- **Combined Setup**: `[light] [settime 08/08/2022 6:00 am]` (set mode + time together)
-- **Mode Display**: Check "Current Date and Time" storycard for current mode
-- **Flexible Switching**: Change modes anytime during your adventure
-
-
-## File Structure
 
 ```
-├── wtg_2.0/                          # Full version
-│   ├── context copy.js               # AI instructions & time
-│   ├── input copy.js                 # Player commands & entities
-│   ├── output copy.js                # Entity detection & cards
-│   ├── library copy.js               # Core functions
-│   └── Documentation.md              # Detailed documentation
-│
-├── wtg_2.0_lightweight/              # Lightweight version
-│   ├── context copy.js               # Time management only
-│   ├── input copy.js                 # Commands only
-│   ├── output copy.js                # Timestamps only
-│   ├── library copy.js               # Core functions
-│   └── Documentation.md              # Lightweight docs
-│
-├── wtg_2.0_scenario/                 # Mode switching version
-│   ├── context copy.js               # Mode-aware AI instructions
-│   ├── input copy.js                 # Multi-command processing
-│   ├── output copy.js                # Mode-specific entity detection
-│   ├── library copy.js               # Combined functions
-│   └── Documentation.md              # Mode-switching docs
-│
-├── autocards+wtg 2.0/                # WTG Lightweight + AutoCards
-│   ├── context.js                    # Combined context processing
-│   ├── input.js                      # Combined input processing
-│   ├── output.js                     # Combined output processing
-│   ├── library.js                    # WTG + AutoCards functions
-│   └── QUICKSTART.md                 # Quick start guide
-│
-├── Innerself+wtg 2.0/                # WTG Lightweight + Inner Self
-│   ├── context.js                    # Combined context processing
-│   ├── input.js                      # Combined input processing
-│   ├── output.js                     # Combined output processing
-│   └── library.js                    # WTG + Inner Self functions
-│
-├── Backup/                           # Version backups
-│   └── [various backup folders]
-│
-├── wtg-time-config-template.json     # Pre-import config card for large scenarios
-│
-└── README.md                         # This file
+Starting Date: 06/15/2023
+Starting Era: AD
+Starting Time: 8:00 AM
+Initialized: true
 ```
 
----
+> **Large scenarios (500+ storycards):** This step is not just recommended — it's essential. Without the WTG Time Config card, WTG must scan every storycard at startup, which causes significant slowdowns in large scenarios. This can cause your adventure to time out on creation, which will make you sad.
 
-## Support & Bug Reports
+### Step 4 — Start Playing
 
-**Developer**: thedenial. (with period)  
-**Discord**: thedenial.  
-**Date**: October 2025
+Launch an adventure from your scenario. If you didn't use the WTG Time Config card, type the following into your first action to initialize the clock:
 
-For bug reports or feature requests, contact via Discord.
+```
+[setStartTime 06/15/2023 8:00 AM AD]
+```
 
----
-
-## Advanced Usage Tips
-
-### Full Version Tips
-
-1. **Debug Mode**: Enable to see parentheses in output for testing
-2. **Time Multiplier**: Adjust to make time pass faster/slower
-3. **Entity Deletion**: Disable to keep deprecated entities in storycards
-4. **Dynamic Time**: Enable for smarter time passage based on action type
-
-### Lightweight Tips
-
-1. **Pre-create Important Cards**: Create storycards before starting
-2. **Use Keys Wisely**: Ensure storycard keys match story mentions
-3. **Check Timestamps**: Verify storycards receive timestamps correctly
-4. **Manual Sleep**: Use `[sleep]` command when resting
+WTG will start tracking time from that point forward.
 
 ---
 
-## Troubleshooting
+## Settings List
 
-### Full Version Issues
+All WTG settings are stored in a storycard titled **Configure WTG**, which WTG creates automatically. Add one setting per line in the format `Setting Name: value`.
 
-**AI not using parentheses?**
-- Check "Enable Generated Character Cards" setting
-- Verify Debug Mode is false (set to true to see parentheses)
-- Review AI Dungeon console logs for errors
-
-**Too many entities created?**
-- AI is being too generous with parentheses
-- Consider using Lightweight version for manual control
-- Or enable "Disable Generated Card Deletion" to keep all cards
-
-**Time moving too fast/slow?**
-- Adjust "Time Duration Multiplier" setting
-- Enable/disable "Enable Dynamic Time" for automatic adjustment
-
-### Lightweight Issues
-
-**Storycards not getting timestamps?**
-- Check that storycard keys match story mentions
-- Verify card isn't a system card (WTG Data, Current Date and Time)
-- Check console logs for errors
-
-**Time not tracking?**
-- Ensure you ran `[settime]` command first
-- Check "Current Date and Time" storycard for current time
-- Verify scripts are properly installed
-
-### Both Versions
-
-**Nothing working at all?**
-- Verify all 4 scripts are copied correctly
-- Check for JavaScript errors in console
-- Ensure scenario allows scripting (Simple Start or Character Creator)
-- Try `[settime]` command to initialize
+| Setting | Default | Options / Notes |
+|---------|---------|-----------------|
+| Enable WTG | `true` | Master on/off switch. Set to `false` to disable WTG entirely. |
+| Time Duration Multiplier | `1.0` | Scales how fast time passes. `2.0` = time passes twice as fast; `0.5` = half speed. |
+| Text Characters per Turn | `600` | Characters per turn for time calculation. This number should be your AI Response length multiplied by 4, unless you take a lot of long Story actions, then you may want to raise it further. This, combined with **Number of Turns per Hour** is used to determine how fast the clock moves before the **Time Duration Multiplier** is applied. |
+| Number of Turns per Hour | `30` | Turns-based time rate. Used together with **Text Characters per Turn**. |
+| Clock Format | `12h` | `12h` or `24h` |
+| Date Format | `american` | `american` = MM/DD/YYYY; `european` = DD/MM/YYYY |
+| Enable Generated Character Cards | `true` | Auto-create storycards for characters the AI names with `(Name)` |
+| Enable Generated Location Cards | `true` | Auto-create storycards for locations the AI names with `((Name))` |
+| Enable Generated Card Deletion | `false` | Auto-delete entity cards that haven't appeared in recent turns |
+| Enable Dynamic Time | `true` | Allow the AI to issue time commands: `(sleep N)` and `(advance N)` |
+| AI Command Nudge | `false` | When a player uses a WTG command, WTG can leave a short visible note in the story so the AI knows time has changed. This setting decides if the AI's time commands also leave this note. Set to `true` to show this note; `false` to suppress it. |
+| Enable Fuzzy Duplicate Matching | `false` | *(Experimental)* Try to detect near-duplicate entity names and avoid creating separate cards for the same character or place |
+| Player Command Clean Mode | `prepend` | Controls how player commands appear in the story text. `prepend` = command is removed and a nudge note is added before the `>` of your action; `in-place` = command is replaced by its nudge note where it was typed; `full` = command is removed with no nudge left behind at all. |
+| Player Command Merge Mode | `all` | Controls how nudge notes from multiple commands are combined. `none` = each command gets its own note; `command-based` = adjacent commands of the same type are merged; `all` = all notes are merged into one. |
+| Enable Card Timestamps | `true` | Inject "first seen" timestamps into storycards |
+| Exclude Card Types | *(empty)* | Comma-separated list of storycard types that should never receive timestamps |
+| Enable Localization | `false` | Use strings from the "WTG: Localization" storycard to translate WTG output labels |
+| Debug Mode | `0` | `0` = off; higher values show progressively more diagnostic output in a Debug Data storycard |
+| Nudge Show Date | `true` | Whether the date appears in the nudge note left after a player command (see **AI Command Nudge**) |
+| Nudge Show Era | `true` | Whether the era (AD/BC) appears in the nudge note |
+| Nudge Show Time | `true` | Whether the time appears in the nudge note |
+| Nudge Show Day of Week | `true` | Whether the day of the week appears in the nudge note |
+| Nudge Show Phase | `true` | Whether the time phase (e.g. "Morning") appears in the nudge note |
+| AN Show Date | `true` | Whether the date appears in the Author's Note time injection |
+| AN Show Era | `true` | Whether the era appears in the Author's Note time injection |
+| AN Show Time | `true` | Whether the time appears in the Author's Note time injection |
+| AN Show Day of Week | `true` | Whether the day of the week appears in the Author's Note time injection |
+| AN Show Phase | `true` | Whether the time phase appears in the Author's Note time injection |
+| DateTime Card Show Phase | `true` | Whether the time phase is shown in the "Current Date and Time" storycard |
 
 ---
 
-## License & Credits
+## Credits
 
-**Created by**: thedenial   
-**License**: Apache 2.0
+**Original concept and World Time Generator 2.0**
+thedenial. — 2025
 
-This is a community-created tool for enhancing AI Dungeon experiences. Not officially affiliated with Latitude (AI Dungeon creators).
+**World Time Generator 3.0 modifications and extensions**
+helpfulduckie (aka bluestar) — 2026
+
+**Integrations**
+- Inner Self system by LewdLeah
+- LOLA system by LewdLeah
+
+**License:** Apache License 2.0 — see LICENSE file for details.
 
 ---
 
-**Made for the AI Dungeon community**
+**Questions or bug reports?**
+Discord: bluestar | Email: helpfulduckie@gmail.com

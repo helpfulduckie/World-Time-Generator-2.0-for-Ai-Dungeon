@@ -1425,7 +1425,7 @@ function parseCommandsSpecific(commands, allowedCommands) {
       command.args = command.rawArgs.length > 0
         ? parseAdvanceSleepCommand(command)
         : parseRandomSleepCommand();
-    } else if (command.commandName === 'goto' || command.commandName === 'sleepuntil') {
+    } else if (command.commandName === 'goto' || command.commandName === 'goback' || command.commandName === 'sleepuntil') {
       command.args = parseGoToCommand(command);
     } else if (command.commandName === 'reset') {
       command.args = {};
@@ -1597,6 +1597,10 @@ function executeCommands(commands, isPlayer) {
       }
     } else if (command.commandName === 'goto') {
       const result = playerCommandGoTo(command.args);
+      if (result.error) command.storyNudge = result.error;
+      else command.args = result.diff;
+    } else if (command.commandName === 'goback') {
+      const result = playerCommandGoBack(command.args);
       if (result.error) command.storyNudge = result.error;
       else command.args = result.diff;
     } else if (command.commandName === 'sleepuntil') {
@@ -1808,7 +1812,7 @@ function generateStoryNudge(command, locCache) {
     const tmpl = getLocalizedString('Nudge Set Start', LOC_DEFAULTS['Nudge Set Start'], locCache);
     command.storyNudge = applyNudgeTemplate(tmpl, '', dt);
 
-  } else if (command.commandName === 'advance' || command.commandName === 'sleep' || command.commandName === 'goto' || command.commandName === 'sleepuntil') {
+  } else if (command.commandName === 'advance' || command.commandName === 'sleep' || command.commandName === 'goto' || command.commandName === 'goback' || command.commandName === 'sleepuntil') {
     const timeUnits = ['years', 'months', 'days', 'hours', 'minutes'];
     let timePassage = '';
 
@@ -1823,7 +1827,7 @@ function generateStoryNudge(command, locCache) {
     timePassage = timePassage.trim();
 
     const dt = _buildNudgeDateTimeStr(state.wtg.time.current.date, getCurrentEra(), state.wtg.time.current.time);
-    if (command.commandName === 'goto' && command.args.isRewind) {
+    if (command.commandName === 'goback') {
       const tmpl = getLocalizedString('Nudge Rewind', LOC_DEFAULTS['Nudge Rewind'], locCache);
       command.storyNudge = applyNudgeTemplate(tmpl, timePassage, dt);
     } else if (command.commandName === 'advance' || command.commandName === 'goto') {
@@ -1863,7 +1867,7 @@ function generateStoryNudge(command, locCache) {
 
 const ALLOWED_COMMANDS = [
   ['advance', 'sleep', 'gencard'],                       // 0: AI commands
-  ['setstarttime', 'advance', 'adv', 'sleep', 'goto', 'sleepuntil', 'reset', 'time'],  // 1: player commands
+  ['setstarttime', 'advance', 'adv', 'sleep', 'goto', 'goback', 'sleepuntil', 'reset', 'time'],  // 1: player commands
 ];
 
 function handleCommands(text, isPlayer, cleanMode, mergeMode, locCache) {
@@ -2250,7 +2254,7 @@ function parseWTGTimeConfig() {
 
 const DEFAULT_SETTINGS = {
   timeMult:               { entry: 'Time Duration Multiplier',          value: '1.0'      },
-  textCharsPerTurn:       { entry: 'Text Characters per Turn',          value: '1400'     },
+  textCharsPerTurn:       { entry: 'Text Characters per Turn',          value: '600'     },
   turnsPerHour:           { entry: 'Number of Turns per Hour',          value: '30'       },
   debugMode:              { entry: 'Debug Mode',                        value: '0'        },
   enableWTG:              { entry: 'Enable WTG',                        value: 'true'     },
@@ -2261,7 +2265,7 @@ const DEFAULT_SETTINGS = {
   aiCommandNudge:         { entry: 'AI Command Nudge',                  value: 'false'    },
   enableFuzzyDuplicates:  { entry: 'Enable Fuzzy Duplicate Matching',   value: 'false'    },
   playerCleanMode:        { entry: 'Player Command Clean Mode',         value: 'prepend'  },
-  playerMergeMode:        { entry: 'Player Command Merge Mode',         value: 'none'     },
+  playerMergeMode:        { entry: 'Player Command Merge Mode',         value: 'all'     },
   clockFormat:            { entry: 'Clock Format',                      value: '12h'      },
   dateFormat:             { entry: 'Date Format',                       value: 'american' },
   nudgeShowDate:          { entry: 'Nudge Show Date',                   value: 'true'     },
@@ -4037,28 +4041,8 @@ function _applyGoToAdvance(args, isSleep) {
   const targetTime24 = parseTime(targetTime);
   const targetDT     = createHistoricalDate(targetParsed.month, targetParsed.day, targetParsed.year, targetEra, targetTime24.hour, targetTime24.min);
 
-  const startParsed = parseDateString(t.start.date, t.start.era, 'american');
-  const startTime24 = parseTime(t.start.time);
-  const startDT     = createHistoricalDate(startParsed.month, startParsed.day, startParsed.year, t.start.era, startTime24.hour, startTime24.min);
-
-  if (targetDT < startDT) {
-    return { error: 'Cannot go before the scenario start time.' };
-  }
-
-  const isRewind = targetDT < currentDT;
-
-  if (!isRewind && targetDT <= currentDT) {
+  if (targetDT <= currentDT) {
     return { error: 'Cannot advance to a time in the past. The target date/time is already passed.' };
-  }
-
-  if (isRewind) {
-    if (isSleep) return { error: 'Cannot sleep until a time in the past. The target date/time is already passed.' };
-    const targetTT   = getDateDiff(t.start.date, t.start.time, targetDate, targetTime, t.start.era, targetEra);
-    const rewindDiff = getDateDiff(targetDate, targetTime, t.current.date, t.current.time, targetEra, t.current.era);
-    _applyRewind(targetTT);
-    clearFutureCooldowns(targetTT);
-    if (getIsDynamicTimeEnabled()) setAdvanceCooldown({ minutes: 5 });
-    return { diff: { ...rewindDiff, isRewind: true } };
   }
 
   const diff = getDateDiff(t.current.date, t.current.time, targetDate, targetTime, t.current.era, targetEra);
@@ -4068,6 +4052,92 @@ function _applyGoToAdvance(args, isSleep) {
   if (!isSleep && getIsDynamicTimeEnabled()) setAdvanceCooldown({ minutes: 5 });
 
   return { diff };
+}
+
+// ── [goBack date|time|both] ────────────────────────────────────────
+function playerCommandGoBack(args) {
+  return _applyGoBackAdvance(args);
+}
+
+/**
+ * Resolves the target date/time from args, validates that it is in the past (but
+ * not before the scenario start), applies the rewind, clears any cooldowns that
+ * are now beyond the new current time, sets the advance cooldown, and returns
+ * { diff } on success or { error } on failure.
+ * Accepts the same parsed args shape as _applyGoToAdvance. Phase and day-of-week
+ * names are not supported (previous occurrence resolution is not implemented).
+ */
+function _applyGoBackAdvance(args) {
+  const t = state.wtg.time;
+  let { targetDate, targetTime, targetEra, ambiguousTime, targetPhase, targetDOW } = args;
+  let dateWasExplicit = !!args.targetDate;
+
+  if (targetPhase) return { error: 'Cannot use a phase name with [goBack]. Please specify an explicit date and time.' };
+  if (targetDOW)   return { error: 'Cannot use a day name with [goBack]. Please specify an explicit date and time.' };
+
+  // Fill in any omitted half from current state.
+  if (!targetDate) { targetDate = t.current.date; targetEra = t.current.era; }
+  if (!targetTime)  targetTime = t.current.time;
+
+  const currentParsed = parseDateString(t.current.date, t.current.era, 'american');
+  const currentTime24 = parseTime(t.current.time);
+  const currentDT     = createHistoricalDate(currentParsed.month, currentParsed.day, currentParsed.year, t.current.era, currentTime24.hour, currentTime24.min);
+
+  if (ambiguousTime) {
+    // Try both AM and PM; pick the nearer *past* candidate.
+    const { hour, min } = parseTime(targetTime);
+    const hourPM        = hour === 12 ? 12 : hour + 12;
+    const parsedDate    = parseDateString(targetDate, targetEra);
+
+    const candidateAM = createHistoricalDate(parsedDate.month, parsedDate.day, parsedDate.year, targetEra, hour,   min);
+    const candidatePM = createHistoricalDate(parsedDate.month, parsedDate.day, parsedDate.year, targetEra, hourPM, min);
+
+    const diffAM = currentDT - candidateAM;  // positive = candidate is in the past
+    const diffPM = currentDT - candidatePM;
+
+    let chosen;
+    if (diffAM > 0 && diffPM > 0) chosen = diffAM <= diffPM ? candidateAM : candidatePM;
+    else if (diffAM > 0)          chosen = candidateAM;
+    else if (diffPM > 0)          chosen = candidatePM;
+    else return { error: 'Cannot go back to a time in the future. Use [goTo] to advance time.' };
+
+    targetTime = convertTo12Hour(`${chosen.getUTCHours()}:${String(chosen.getUTCMinutes()).padStart(2, '0')}`);
+    ambiguousTime = false;
+  } else {
+    // Unambiguous time — if no explicit date was given and target time ≥ current, go back to yesterday.
+    if (!dateWasExplicit) {
+      const tgt24 = parseTime(targetTime);
+      const tgtMs = tgt24.hour * 60 + tgt24.min;
+      const curMs = currentTime24.hour * 60 + currentTime24.min;
+      if (tgtMs >= curMs) {
+        const prev = advanceDate(targetDate, -1, targetEra);
+        targetDate = prev.dateStr;
+        targetEra  = prev.era;
+      }
+    }
+  }
+
+  const targetParsed = parseDateString(targetDate, targetEra);
+  const targetTime24 = parseTime(targetTime);
+  const targetDT     = createHistoricalDate(targetParsed.month, targetParsed.day, targetParsed.year, targetEra, targetTime24.hour, targetTime24.min);
+
+  const startParsed = parseDateString(t.start.date, t.start.era, 'american');
+  const startTime24 = parseTime(t.start.time);
+  const startDT     = createHistoricalDate(startParsed.month, startParsed.day, startParsed.year, t.start.era, startTime24.hour, startTime24.min);
+
+  if (targetDT < startDT) {
+    return { error: 'Cannot go before the scenario start time.' };
+  }
+  if (targetDT >= currentDT) {
+    return { error: 'Cannot go back to a time that is not in the past. Use [goTo] to advance time.' };
+  }
+
+  const targetTT   = getDateDiff(t.start.date, t.start.time, targetDate, targetTime, t.start.era, targetEra);
+  const rewindDiff = getDateDiff(targetDate, targetTime, t.current.date, t.current.time, targetEra, t.current.era);
+  _applyRewind(targetTT);
+  clearFutureCooldowns(targetTT);
+  if (getIsDynamicTimeEnabled()) setAdvanceCooldown({ minutes: 5 });
+  return { diff: rewindDiff };
 }
 
 /**
