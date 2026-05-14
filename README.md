@@ -297,7 +297,7 @@ All WTG settings are stored in a storycard titled **Configure WTG**, which WTG c
 | Enable Card Timestamps | `true` | Inject "first seen" timestamps into storycards |
 | Exclude Card Types | *(empty)* | Comma-separated list of storycard types that should never receive timestamps |
 | Enable Localization | `false` | Use strings from the "WTG: Localization" storycard to translate WTG output labels |
-| Debug Mode | `0` | `0` = off; higher values show progressively more diagnostic output in a Debug Data storycard |
+| Debug Mode | `1` | `0` = off; `1` = errors only; `2` = all messages. Output appears in a "Duckie Debug Data" storycard. |
 | Nudge Show Date | `true` | Whether the date appears in the nudge note left after a player command (see **AI Command Nudge**) |
 | Nudge Show Era | `true` | Whether the era (AD/BC) appears in the nudge note |
 | Nudge Show Time | `true` | Whether the time appears in the nudge note |
