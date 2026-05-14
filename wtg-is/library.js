@@ -333,10 +333,10 @@ function _effectiveField(modName, groupName) {
 // ===========================================================================
 
 function _ensureState() {
-  if (!state.unified_settings || typeof state.unified_settings !== 'object') {
-    state.unified_settings = {};
+  if (!state.unifiedSettings || typeof state.unifiedSettings !== 'object') {
+    state.unifiedSettings = {};
   }
-  return state.unified_settings;
+  return state.unifiedSettings;
 }
 
 function _getCached(modName, groupName, internalKey) {
@@ -349,6 +349,73 @@ function _setCached(modName, groupName, internalKey, value) {
   if (!us[modName])            us[modName] = {};
   if (!us[modName][groupName]) us[modName][groupName] = {};
   us[modName][groupName][internalKey] = value;
+}
+
+
+// ===========================================================================
+// REGISTRY STATE ACCUMULATION
+// ===========================================================================
+
+/**
+ * Merges state.unifiedSettings._registry into the module-level _registry.
+ * Called at the top of ensureSettingCardsExist so registrations from prior
+ * hooks (which reset the module-level _registry on re-evaluation) are
+ * restored. Existing _registry entries are not overwritten.
+ */
+
+function _mergeStateRegistryIntoLocal() {
+  const us = _ensureState();
+  const sr = us._registry;
+  if (!sr || typeof sr !== 'object') return;
+  for (const modName of Object.keys(sr)) {
+    const sm = sr[modName];
+    if (!_registry[modName]) {
+      _registry[modName] = {
+        description: sm.description || '',
+        card:        sm.card        || _defaultCard,
+        field:       sm.field       || '',
+        position:    typeof sm.position === 'number' ? sm.position : 5,
+        groups:      {},
+      };
+    }
+    const lm = _registry[modName];
+    const sg = sm.groups || {};
+    for (const groupName of Object.keys(sg)) {
+      const sgroup = sg[groupName];
+      if (!lm.groups[groupName]) {
+        lm.groups[groupName] = {
+          description: sgroup.description || '',
+          card:        sgroup.card        || null,
+          field:       sgroup.field       || '',
+          position:    typeof sgroup.position === 'number' ? sgroup.position : 5,
+          settings:    [],
+        };
+      }
+      const lgroup = lm.groups[groupName];
+      for (const setting of (sgroup.settings || [])) {
+        if (!lgroup.settings.find(function(s) { return s.internalKey === setting.internalKey; })) {
+          lgroup.settings.push({
+            internalKey:  setting.internalKey,
+            key:          setting.key,
+            defaultValue: setting.defaultValue,
+            description:  setting.description  || '',
+            valueType:    setting.valueType     || null,
+          });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Serializes the current module-level _registry into state.unifiedSettings._registry.
+ * Called after _mergeStateRegistryIntoLocal so this hook's new registrations
+ * are persisted for future hooks.
+ */
+
+function _saveLocalRegistryToState() {
+  const us = _ensureState();
+  us._registry = JSON.parse(JSON.stringify(_registry));
 }
 
 
@@ -370,8 +437,9 @@ function _renderCardField(cardTitle, field) {
   if (!field) field = _defaultField;
   const lines = [];
 
-  const sortedMods = Object.keys(_registry)
-    .map(function(modName, idx) { return { modName: modName, idx: idx }; })
+  // Build sorted mod entries.
+  const modEntries = Object.keys(_registry)
+    .map(function(modName, idx) { return { kind: 'mod', modName: modName, idx: idx }; })
     .filter(function(e) {
       return Object.keys(_registry[e.modName].groups).some(function(g) {
         return _effectiveCard(e.modName, g) === cardTitle &&
@@ -379,14 +447,41 @@ function _renderCardField(cardTitle, field) {
                _registry[e.modName].groups[g].settings.length > 0;
       });
     })
-    .sort(function(a, b) {
-      const pa = _registry[a.modName].position !== undefined ? _registry[a.modName].position : 5;
-      const pb = _registry[b.modName].position !== undefined ? _registry[b.modName].position : 5;
-      return pa !== pb ? pa - pb : a.idx - b.idx;
+    .map(function(e) {
+      const pos = _registry[e.modName].position !== undefined ? _registry[e.modName].position : 5;
+      return { kind: 'mod', modName: e.modName, idx: e.idx, position: pos };
     });
 
-  for (let mi = 0; mi < sortedMods.length; mi++) {
-    const modName = sortedMods[mi].modName;
+  // Build sorted text block entries from state.
+  // State shape: _textblocks[cardTitle][field][modName][key] = { text, position }
+  const us = _ensureState();
+  const tbState = us._textblocks;
+  const byMod = (tbState && tbState[cardTitle] && tbState[cardTitle][field]) || {};
+  const rawBlocks = [];
+  for (const modName of Object.keys(byMod)) {
+    for (const key of Object.keys(byMod[modName])) {
+      rawBlocks.push(byMod[modName][key]);
+    }
+  }
+  const textEntries = rawBlocks.map(function(b, idx) {
+    return { kind: 'text', text: b.text, idx: modEntries.length + idx, position: typeof b.position === 'number' ? b.position : 5 };
+  });
+
+  // Merge and sort by position then insertion index.
+  const allEntries = modEntries.concat(textEntries).sort(function(a, b) {
+    return a.position !== b.position ? a.position - b.position : a.idx - b.idx;
+  });
+
+  for (let ei = 0; ei < allEntries.length; ei++) {
+    const entry = allEntries[ei];
+    if (ei > 0) { lines.push(''); lines.push(''); }
+
+    if (entry.kind === 'text') {
+      lines.push(entry.text);
+      continue;
+    }
+
+    const modName = entry.modName;
     const modData = _registry[modName];
 
     const relevantGroups = Object.keys(modData.groups)
@@ -402,8 +497,6 @@ function _renderCardField(cardTitle, field) {
         return pa !== pb ? pa - pb : a.idx - b.idx;
       })
       .map(function(e) { return e.groupName; });
-
-    if (mi > 0) { lines.push(''); lines.push(''); }
 
     lines.push('- ' + modName + (modData.description ? ' | ' + modData.description : ''));
 
@@ -429,7 +522,7 @@ function _renderCardField(cardTitle, field) {
       }
       return lines.join('\n');
     }
-    return { _normalizeValue, _parseArray, _serializeArray, _simplify, _fuzzyMatchTitle, _fuzzyFindCard, _parseCardEntry, _parseCardSections, _escapeRegex, _effectiveCard, _effectiveField, _ensureState, _getCached, _setCached, _renderCardField, _registry, _defaultCard, _defaultGroup, _defaultField };
+    return { _normalizeValue, _parseArray, _serializeArray, _simplify, _fuzzyMatchTitle, _fuzzyFindCard, _parseCardEntry, _parseCardSections, _escapeRegex, _effectiveCard, _effectiveField, _ensureState, _getCached, _setCached, _mergeStateRegistryIntoLocal, _saveLocalRegistryToState, _renderCardField, _registry, _defaultCard, _defaultGroup, _defaultField };
   })();
 
   static input(text) {
@@ -509,6 +602,9 @@ function _renderCardField(cardTitle, field) {
   }
 
   static ensureSettingCardsExist() {
+    // Restore registrations from prior hooks (module-level UnifiedSettings.#lib._registry resets each hook).
+    UnifiedSettings.#lib._mergeStateRegistryIntoLocal();
+  
     // Collect unique card titles and the set of fields used on each card.
     const cardFields = {}; // cardTitle → Set of field strings
     for (const modName of Object.keys(UnifiedSettings.#lib._registry)) {
@@ -522,16 +618,51 @@ function _renderCardField(cardTitle, field) {
       }
     }
   
+    // Also include fields that have text blocks but no settings registrations,
+    // so text-only fields are rendered even when no settings exist for them.
+    const usForTB = UnifiedSettings.#lib._ensureState();
+    if (usForTB._textblocks) {
+      for (const cardTitle of Object.keys(usForTB._textblocks)) {
+        for (const field of Object.keys(usForTB._textblocks[cardTitle])) {
+          if (!cardFields[cardTitle]) cardFields[cardTitle] = new Set();
+          cardFields[cardTitle].add(field);
+        }
+      }
+    }
+  
+    // Persist complete registry to state so future hooks (which re-evaluate the
+    // module) can restore all registrations via UnifiedSettings.#lib._mergeStateRegistryIntoLocal.
+    UnifiedSettings.#lib._saveLocalRegistryToState();
+  
+    // Track every card+field we have ever managed so removals still trigger a
+    // re-render (clearing stale content) even when the registry is now empty
+    // for that card.
+    const usForManaged = UnifiedSettings.#lib._ensureState();
+    if (!usForManaged._managedCards) usForManaged._managedCards = {};
+    for (const ct of Object.keys(cardFields)) {
+      if (!usForManaged._managedCards[ct]) usForManaged._managedCards[ct] = [];
+      for (const f of cardFields[ct]) {
+        if (usForManaged._managedCards[ct].indexOf(f) === -1) usForManaged._managedCards[ct].push(f);
+      }
+    }
+    for (const ct of Object.keys(usForManaged._managedCards)) {
+      if (!cardFields[ct]) cardFields[ct] = new Set();
+      for (const f of usForManaged._managedCards[ct]) cardFields[ct].add(f);
+    }
+  
     for (const cardTitle of Object.keys(cardFields)) {
       const fields = cardFields[cardTitle];
       let card = UnifiedSettings.#lib._fuzzyFindCard(cardTitle);
+      const us = UnifiedSettings.#lib._ensureState();
+      const byMod = (us._cardkeys && us._cardkeys[cardTitle]) || {};
+      const cardKeys = Object.keys(byMod).map(function(m) { return byMod[m]; }).filter(Boolean).join(', ');
   
       if (!card) {
         addStoryCard(cardTitle);
         card = storyCards[storyCards.length - 1];
         if (card) {
           card.type = 'zz_Settings';
-          card.keys = '';
+          card.keys = cardKeys;
           for (const field of fields) {
             card[field] = UnifiedSettings.#lib._renderCardField(cardTitle, field);
           }
@@ -569,7 +700,17 @@ function _renderCardField(cardTitle, field) {
         card[field] = UnifiedSettings.#lib._renderCardField(cardTitle, field);
       }
   
-      card.keys = '';
+      card.keys = cardKeys;
+  
+      // Delete the card if it is now completely empty (no settings, no text
+      // blocks, no keys). Also purge it from _managedCards so future hook calls
+      // do not attempt to re-create it.
+      const allFieldsEmpty = Array.from(fields).every(function(f) { return !card[f]; });
+      if (allFieldsEmpty && !cardKeys) {
+        const idx = storyCards.indexOf(card);
+        if (idx !== -1) storyCards.splice(idx, 1);
+        delete usForManaged._managedCards[cardTitle];
+      }
     }
   }
 
@@ -631,6 +772,81 @@ function _renderCardField(cardTitle, field) {
   static resetModSetting(modName, internalKey) {
     UnifiedSettings.resetSetting(modName, UnifiedSettings.#lib._defaultGroup, internalKey);
   }
+
+  static defineText(obj) {
+    if (!obj || !obj.modName || !obj.key || obj.text == null) return;
+    const cardTitle = obj.card || UnifiedSettings.#lib._defaultCard;
+    const field     = obj.field     || UnifiedSettings.#lib._defaultField;
+    const position  = typeof obj.position === 'number' ? obj.position : 5;
+    const us = UnifiedSettings.#lib._ensureState();
+    if (!us._textblocks)                                          us._textblocks = {};
+    if (!us._textblocks[cardTitle])                               us._textblocks[cardTitle] = {};
+    if (!us._textblocks[cardTitle][field])                        us._textblocks[cardTitle][field] = {};
+    if (!us._textblocks[cardTitle][field][obj.modName])           us._textblocks[cardTitle][field][obj.modName] = {};
+    us._textblocks[cardTitle][field][obj.modName][obj.key] = { text: obj.text, position: position };
+  }
+
+  static removeText(modName, key) {
+    const us = UnifiedSettings.#lib._ensureState();
+    if (!us._textblocks) return;
+    for (const cardTitle of Object.keys(us._textblocks)) {
+      for (const field of Object.keys(us._textblocks[cardTitle])) {
+        const byMod = us._textblocks[cardTitle][field];
+        if (byMod[modName]) {
+          delete byMod[modName][key];
+        }
+      }
+    }
+  }
+
+  static defineCardKeys(modName, cardTitle, text) {
+    const us = UnifiedSettings.#lib._ensureState();
+    if (!us._cardkeys)              us._cardkeys = {};
+    if (!us._cardkeys[cardTitle])   us._cardkeys[cardTitle] = {};
+    us._cardkeys[cardTitle][modName] = text;
+  }
+
+  static removeCardKeys(modName, cardTitle) {
+    const us = UnifiedSettings.#lib._ensureState();
+    if (us._cardkeys && us._cardkeys[cardTitle]) {
+      delete us._cardkeys[cardTitle][modName];
+    }
+  }
+
+  static removeSetting(modName, groupName, internalKey) {
+    const groups = UnifiedSettings.#lib._registry[modName] && UnifiedSettings.#lib._registry[modName].groups;
+    const settings = groups && groups[groupName] && groups[groupName].settings;
+    if (settings) {
+      const idx = settings.findIndex(function(s) { return s.internalKey === internalKey; });
+      if (idx !== -1) settings.splice(idx, 1);
+    }
+    const us = UnifiedSettings.#lib._ensureState();
+    const sr = us.UnifiedSettings.#lib._registry;
+    const sgroups = sr && sr[modName] && sr[modName].groups;
+    const ssettings = sgroups && sgroups[groupName] && sgroups[groupName].settings;
+    if (ssettings) {
+      const idx = ssettings.findIndex(function(s) { return s.internalKey === internalKey; });
+      if (idx !== -1) ssettings.splice(idx, 1);
+    }
+  }
+
+  static removeGroup(modName, groupName) {
+    if (UnifiedSettings.#lib._registry[modName] && UnifiedSettings.#lib._registry[modName].groups) {
+      delete UnifiedSettings.#lib._registry[modName].groups[groupName];
+    }
+    const us = UnifiedSettings.#lib._ensureState();
+    const sr = us.UnifiedSettings.#lib._registry;
+    if (sr && sr[modName] && sr[modName].groups) {
+      delete sr[modName].groups[groupName];
+    }
+  }
+
+  static removeMod(modName) {
+    delete UnifiedSettings.#lib._registry[modName];
+    const us = UnifiedSettings.#lib._ensureState();
+    const sr = us.UnifiedSettings.#lib._registry;
+    if (sr) delete sr[modName];
+  }
 }
 
 class DuckieDebug {
@@ -642,6 +858,7 @@ class DuckieDebug {
     const DUCKIE_DEBUG_MODE = 1;
     const DUCKIE_MOD_NAME = "DuckieDebug";
     const DUCKIE_SETTING_KEY = 'Debug Mode';
+    const DUCKIE_FIELD = 'description';
     
     
     const DEFAULT_SETTINGS = {
@@ -652,10 +869,10 @@ class DuckieDebug {
     };
     
     function preHook(){
-        UnifiedSettings.defineMod(DUCKIE_MOD_NAME, 'Debug output level', undefined, undefined, 9);
+        UnifiedSettings.defineMod(DUCKIE_MOD_NAME, 'Debug output level', undefined, DUCKIE_FIELD, 9);
         UnifiedSettings.defineSettings(DEFAULT_SETTINGS);
     }
-    return { preHook, _duckieDebugLevel, DUCKIE_DEBUG_CARD, DUCKIE_DEBUG_TYPE, DUCKIE_DEBUG_MODE, DUCKIE_MOD_NAME, DUCKIE_SETTING_KEY, DEFAULT_SETTINGS };
+    return { preHook, _duckieDebugLevel, DUCKIE_DEBUG_CARD, DUCKIE_DEBUG_TYPE, DUCKIE_DEBUG_MODE, DUCKIE_MOD_NAME, DUCKIE_SETTING_KEY, DUCKIE_FIELD, DEFAULT_SETTINGS };
   })();
 
   static duckieDebugMode = { OFF: 0, ERROR: 1, INFORM: 2 };
@@ -3168,6 +3385,8 @@ function parseWTGTimeConfig() {
 // constants.js - Shared constants, maps, and regex patterns for WTG
 
 const LOCALIZATION_DEFAULT = "false";
+const VERSION = '3.0.4';
+const GITHUB = 'https://github.com/helpfulduckie/World-Time-Generator-3.0';
 
 /*
 # Main Settings Card
@@ -4861,11 +5080,13 @@ const _GROUP_DESCRIPTIONS = {
 };
 
 function wtgPrehook() {
-  UnifiedSettings.defineMod('WTG', 'World Time Generator', 'Configure WTG');
+  UnifiedSettings.defineMod('WTG', 'World Time Generator', SYSTEM_CARD_TITLES.WTG_SETTINGS, 'description');
   for (const [groupName, settings] of Object.entries(_WTG_GROUPS)) {
     UnifiedSettings.defineGroup('WTG', groupName, _GROUP_DESCRIPTIONS[groupName] || '');
-    UnifiedSettings.defineSettings({ modName: 'WTG', group: groupName, card: 'Configure WTG', setting: settings });
+    UnifiedSettings.defineSettings({ modName: 'WTG', group: groupName, card: SYSTEM_CARD_TITLES.WTG_SETTINGS, setting: settings });
   }
+  UnifiedSettings.defineText({modName: 'WTG', key: 'credit', card: SYSTEM_CARD_TITLES.WTG_SETTINGS, field: 'entry', text: `This scenario is using World Time Generator v.${VERSION}. \n\nYou can configure the settings below in the Notes section. \n\nVisit github via the link in the Triggers for more information on how to use or how to add it to your own scenarios. \nWorld Time Generator is an open-source AI Dungeon mod for time management by helpfulDuckie. You have my full permission to use it or its components with any scenario or mod bundle.`})
+  UnifiedSettings.defineCardKeys('WTG', SYSTEM_CARD_TITLES.WTG_SETTINGS, GITHUB);
   locPrehook();
 }
 
@@ -14466,5 +14687,3 @@ function innerSelf(hook, text) {
       return { text };
   }
 }
-
-module.exports = { UnifiedSettings, DuckieDebug, RevampedHistory, worldTimeGenerator, innerSelf };
